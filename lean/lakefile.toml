@@ -1,0 +1,16 @@
+name = "NondimVerify"
+version = "0.1.0"
+defaultTargets = ["NondimVerify", "NondimVerifyTest"]
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.35.0"
+
+# The library: definitions, theory, hand proofs, generated certificates.
+[[lean_lib]]
+name = "NondimVerify"
+
+# Unit tests written in Lean (`example`s that must compile).
+[[lean_lib]]
+name = "NondimVerifyTest"

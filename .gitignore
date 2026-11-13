@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Lean
+lean/.lake/
+lean/Scratch/
+lean/NondimVerify/Scratch/
+lean/_tmp_*.lean
+
+# Local run output
+*.log
+python_report.txt
+.DS_Store
+
+# Personal course notes: kept on disk, not published
+docs/PROPOSAL_NOTES.md
+
+# macOS double-click launchers (local convenience)
+*.command
+
+# Leftovers set aside for manual deletion
+_to_delete/

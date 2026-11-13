@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "verified-nondim"
+dynamic = ["version"]
+description = "Nondimensionalize ODE models automatically, with certificates that Lean 4 checks"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Will Mitchell" }]
+keywords = [
+    "nondimensionalization", "dimensional analysis", "Buckingham Pi", "scaling symmetry",
+    "ODE", "mathematical biology", "identifiability", "Lean 4", "formal verification",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = ["sympy>=1.12", "numpy>=1.24", "scipy>=1.10"]
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.7"]
+dev = ["pytest>=7", "matplotlib>=3.7", "build>=1.2", "twine>=6.1"]
+
+[project.scripts]
+nondim = "nondim.cli:main"
+
+# [project.urls] is added by scripts/set_repo_url.py when the repository is created.
+[project.urls]
+Homepage = "https://github.com/willmitchellcodes/verified-nondim"
+Documentation = "https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/GUIDE.md"
+Issues = "https://github.com/willmitchellcodes/verified-nondim/issues"
+Changelog = "https://github.com/willmitchellcodes/verified-nondim/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "python/nondim/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/nondim"]
+
+# The Lean project that checks the certificates ships inside the wheel,
+# so `nondim init-lean DIR` works after a plain `pip install`.
+[tool.hatch.build.targets.wheel.force-include]
+"lean/lakefile.toml" = "nondim/_lean_template/lakefile.toml"
+"lean/lean-toolchain" = "nondim/_lean_template/lean-toolchain"
+"lean/lake-manifest.json" = "nondim/_lean_template/lake-manifest.json"
+"lean/NondimVerify.lean" = "nondim/_lean_template/NondimVerify.lean"
+"lean/NondimVerifyTest.lean" = "nondim/_lean_template/NondimVerifyTest.lean"
+"lean/NondimVerify" = "nondim/_lean_template/NondimVerify"
+"lean/NondimVerifyTest" = "nondim/_lean_template/NondimVerifyTest"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/python", "/lean", "/docs", "/examples", "/assets", "/scripts", "/reports",
+    "/README.md", "/LICENSE", "/CHANGELOG.md", "/pyproject.toml",
+]
+exclude = ["/lean/.lake", "/lean/Scratch", "/lean/_tmp_*", "/docs/PROPOSAL_NOTES.md", "__pycache__", ".pytest_cache"]
