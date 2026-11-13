@@ -20,6 +20,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
+      # Optional second solver: its answers are certified too. The pinned commit is desr 3.0.0.
+      - run: pip install "git+https://github.com/ofloveandhate/desr@deff1c066198befb3454db45c9e802c266ab19ed"
       - name: Unit tests and bridge tests that do not need Lean
         working-directory: python
         run: python -m pytest -q -m "not lean"
@@ -37,6 +39,8 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install -e ".[dev]"
+      # Optional second solver: its answers are certified too. The pinned commit is desr 3.0.0.
+      - run: pip install "git+https://github.com/ofloveandhate/desr@deff1c066198befb3454db45c9e802c266ab19ed"
       - name: Lean must accept good certificates and reject corrupted ones
         working-directory: python
         run: python -m pytest -q -m lean

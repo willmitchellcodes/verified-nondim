@@ -12,11 +12,11 @@ Fold spread = largest / smallest estimate across fits (1.00 = all fits agree).
 
 | raw parameter | fold spread | | invariant group | fold spread |
 |---|---|---|---|---|
-| beta | 19.3 | | gamma | 1.000 |
+| beta | 13.5 | | gamma | 1.000 |
 | gamma | 1 | | R0 = beta*S0/gamma | 1.000 |
-| rho | 19.3 | | y0 = rho*I0 | 1.000 |
-| S0 | 19.3 | | kappa = beta/rho | 1.000 |
-| I0 | 19.3 | | | |
+| rho | 13.5 | | y0 = rho*I0 | 1.000 |
+| S0 | 13.5 | | kappa = beta/rho | 1.000 |
+| I0 | 13.5 | | | |
 
 The groups are pinned down; the raw parameters moved by the scaling are not.
 

@@ -3,3 +3,8 @@ import NondimVerifyTest.Tactics
 import NondimVerifyTest.Theory
 import NondimVerifyTest.SIR
 import NondimVerifyTest.Certificates
+import NondimVerifyTest.System
+import NondimVerifyTest.Criterion
+import NondimVerifyTest.BuckinghamPi
+import NondimVerifyTest.Reduction
+import NondimVerifyTest.Limits

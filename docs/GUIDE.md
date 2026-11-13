@@ -22,9 +22,10 @@ source .venv/bin/activate
 nondim tour                     # 2-minute guided walk through the example above
 ```
 
-Then read, in this order: `docs/BACKGROUND.md` (the math by hand) → `examples/` (four short
-scripts) → `reports/sir.md` (what the tool says about SIR) → `docs/DECISIONS.md` (why
-everything is built the way it is, with evidence and sources).
+Then read, in this order: `docs/BACKGROUND.md` (the math by hand) → `examples/` (five short
+scripts) → `reports/sir.md` (what the tool says about SIR) → `docs/THEORY.md` (the theorems
+that hold for every model) → `docs/DESR.md` (checking the reference tool) →
+`docs/DECISIONS.md` (why everything is built the way it is, with evidence and sources).
 
 ## The pipeline
 
@@ -42,6 +43,21 @@ everything is built the way it is, with evidence and sources).
 
 If the Python code is wrong, `lake build` fails. You only have to trust the small Lean checks
 and the inputs you typed.
+
+### The second pipeline: general theorems and desr
+
+```
+ equations ─► desr (or our solver) ─► hlform.py: one neutral form ─► lean_export2.py ─► Certified/{Desr,Own}/<Model>.lean
+              untrusted               checked exactly in Python       per model:          proved from the general theorems in
+                                                                       matrices +          System · Criterion · BuckinghamPi · Reduction
+                                                                       one identity per equation
+```
+
+The first pipeline certifies matrix facts about each model. The second proves the theory once
+(`docs/THEORY.md`) and lets a certificate say something stronger: *along every positive
+solution, the tool's new variables satisfy the tool's reduced equations*. It also accepts
+desr's answers, not only ours (`docs/DESR.md`). Models with unit links or rational right-hand
+sides are covered by the first pipeline only.
 
 ## The three framings
 
@@ -64,10 +80,24 @@ Run with the virtual environment active (`python -m nondim …` works too).
 | `nondim constrain <model> -k 2 --keep beta --want R0=beta*N/gamma` | SAT/UNSAT with reasons |
 | `nondim identify <model> -o y=rho*I` | non-identifiable parameters from scalings |
 | `nondim experiment` | SIR data-fitting experiment → `reports/identifiability_sir.md` |
-| `nondim certify` | regenerate the Lean certificates |
+| `nondim desr <model>` | run desr on a model and cross-check it against this package (needs desr, see `docs/DESR.md`) |
+| `nondim compare` | desr vs. this package on every model → `reports/desr_comparison.md` |
+| `nondim certify` | regenerate the Lean certificates (both kinds; desr's when desr is installed) |
 | `nondim all` | everything: `reports/`, certificates, experiment |
 | `cd python && python -m pytest -q` | all Python + bridge tests (Lean tests run if Lean is installed) |
 | `cd lean && lake build` | Lean re-checks every certificate, proof and Lean unit test |
+
+## What Lean checks for each model in the general form (`lean/NondimVerify/Certified/`)
+
+| Theorem | Meaning |
+|---|---|
+| `eq_<state>` | the Lean data is the equation you wrote |
+| `symmetry` | the tool's scalings are symmetries (decided from the data) |
+| `invariant`, `unimodular`, `auxiliaries_free`, `auxiliaries_are_parameters` | the new variables are dimensionless and the change of variables is invertible |
+| `reduction_correct` | along every positive solution, the new variables satisfy the reduced equations in the new time |
+| `cross_section` | the solution rescales to one in which the removed parameter groups equal 1 |
+| `invariants_complete` | Buckingham Pi: anything unit-independent is a function of the new variables |
+| `kills_K`, `rank_K`, `rank_A` | no scaling was missed |
 
 ## What Lean checks for each model (`lean/NondimVerify/Cert/<Model>.lean`)
 
@@ -109,11 +139,13 @@ to `python/nondim/models.py` and an entry to `python/nondim/catalog.py`.
 ```
 README.md  pyproject.toml  LICENSE  CHANGELOG.md  setup.sh
 assets/    logo.svg
-docs/      GUIDE.md  BACKGROUND.md  DECISIONS.md  TESTING.md  READING.md  RELEASING.md
-examples/  01_quickstart  02_constraints  03_identifiability  04_your_own_model
-reports/   generated: SUMMARY.md, one report per model, identifiability_sir.md/.png
+docs/      GUIDE.md  BACKGROUND.md  THEORY.md  DESR.md  DECISIONS.md  TESTING.md  READING.md  RELEASING.md
+examples/  01_quickstart  02_constraints  03_identifiability  04_your_own_model  05_certify_desr
+reports/   generated: SUMMARY.md, one report per model, identifiability_sir.md/.png, desr_comparison.md
 python/    nondim/ (the package)   tests/ (pytest)
 lean/      NondimVerify/ (library)   NondimVerifyTest/ (Lean unit tests)
+             Basic · Theory · SIR · Cert/            first release
+             System · Criterion · BuckinghamPi · Reduction · Certified/{Desr,Own}/   general theory
 scripts/   publish_github.sh  publish_pypi.sh  set_repo_url.py
            workflows/  GitHub Actions templates: ci.yml, publish.yml, dependabot.yml
 ```
@@ -127,6 +159,8 @@ scripts/   publish_github.sh  publish_pypi.sh  set_repo_url.py
 * Only products, quotients and sums of powers. No `exp`, `log`, non-integer Hill exponents, °C.
 * Scalings are not all symmetries, so the identifiability test is one-way.
 * Proofs are about exact real numbers, not floating-point solvers.
+* The general theory covers autonomous polynomial systems, positive solutions, and reductions
+  in which each new state variable is one state times parameters (`docs/THEORY.md` §7).
 
 ## Troubleshooting
 

@@ -75,3 +75,28 @@ review, so check the latest versions before quoting.
   Mathlib's `linarith`, `linear_combination` and `eval_rank` all work this way.
 * **Lean tactics in this repo:** `decide +kernel`, `eval_rank`, `field_simp`, `ring`,
   `HasDerivAt` lemmas, `unfold`, `rw`, `simp`.
+
+## For the general theorems and the desr certificates
+
+Read in this order; each item names the file where the idea is used.
+
+1. **Hubert & Labahn (2013)**, §2–3: scaling matrix, Hermite multiplier `V = [Vi | Vn]`, its
+   inverse `W`, invariants as the columns of `Vn`, and reduction on a cross-section. This is
+   the form `nondim/hlform.py` stores and `Reduction.lean` gives meaning to.
+2. **Tanburn et al. (2025)**, §3: what desr computes and returns, and its three reduction
+   schemes. Only the "parameter" scheme is certified so far (`docs/DESR.md`, Scope).
+3. **A proof of the Buckingham Pi theorem that goes through logarithms.** The Wikipedia article
+   "Buckingham π theorem" has a short formal proof; compare it with `exists_scaling_of_piGroups_eq`
+   in `BuckinghamPi.lean`, where the key step is "orthogonal to the kernel ⟹ in the row space".
+4. **Botta et al. (2023), "Types, equations, dimensions and the Pi theorem"**, arXiv:2308.09481.
+   Why the textbook statement of the Pi theorem is hard to make constructive. Useful for
+   placing `buckingham_pi_factorization` (which uses classical choice). https://arxiv.org/abs/2308.09481
+5. **Mathlib pieces worth opening:** `is_const_of_deriv_eq_zero` (mean value theorem, used for
+   "parameters are constant"), `LinearMap.exists_leftInverse_of_injective` and
+   `Submodule.exists_dual_map_eq_bot_of_notMem` (the two linear-algebra facts behind the
+   criterion and the Pi theorem), `HasDerivAt.comp` (the chain rule).
+
+Methods to add to the list above: **decidable propositions** (`decide +kernel` proving
+`sys.IsSymmetry A tau` by evaluation), **certificates for linear algebra** (a left inverse or a
+kernel vector instead of a rank), and **property-based testing** (random models as a second
+opinion on a design; it changed this one, see `docs/DESR.md`).

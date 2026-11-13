@@ -6,7 +6,10 @@ models.py). Everything is plain data.
     normalize    which parameters to set to 1 (None = let the solver choose)
     constraints  list of requests for constraints.solve (Framing 2)
     dims         physical dimensions, only for the Buckingham Pi comparison
-    certify      write a Lean certificate for this model (Framing 1)
+    certify      write a matrix-level Lean certificate for this model (lean/NondimVerify/Cert/)
+
+Certificates in the general form (lean/NondimVerify/Certified/) are written for every model
+the general theory covers; see `GENERAL` below.
 """
 
 CATALOG = {
@@ -55,3 +58,8 @@ CATALOG = {
     "spurious_substituted": dict(normalize=None),
     "spurious_fixed": dict(normalize=None, certify=True, constraints=[dict(eliminate_at_least=2)]),
 }
+
+# Models exported in the general form (polynomial right-hand sides, no unit links).
+# "Own" certificates come from this package's solver; "Desr" ones from desr, when it is installed.
+GENERAL = ["logistic", "sir_noN", "sir_reported", "lotka_volterra", "michaelis_menten",
+           "spurious_original", "spurious_substituted"]

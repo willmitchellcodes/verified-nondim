@@ -78,7 +78,7 @@ def test_readme_is_short_and_points_to_existing_files():
 
 
 @pytest.mark.parametrize("command", ["tour", "list", "show", "reduce", "constrain", "identify", "experiment",
-                                     "init-lean", "certify", "all"])
+                                     "desr", "compare", "init-lean", "certify", "all"])
 def test_every_documented_command_exists(command):
     with pytest.raises(SystemExit) as e:
         cli.main([command, "--help"])

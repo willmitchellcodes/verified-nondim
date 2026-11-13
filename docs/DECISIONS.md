@@ -13,19 +13,22 @@ Sources are listed in full at the end, keyed like [HL13].
 
 ## Status on 2026-11-13
 
-* `python -m pytest -q`: **471 tests pass** (452 Python/bridge/packaging + 19 that call Lean).
-* `lake build`: **passes** with Lean 4.35.0 / Mathlib v4.35.0: 6 generated certificates,
-  `Basic`, `Theory`, `SIR`, and 5 Lean test files. No `sorry` outside `Exercises.lean`
-  (`test_key_theorems_do_not_depend_on_sorry` checks this with `#print axioms`).
-* Where this was run: natively on the Mac via `./setup.sh` (before packaging: 425 Python tests,
-  `lake build` of 2459 jobs, 19 Lean bridge tests) and in the assistant's cloud workspace
-  (after packaging: all 471).
-* Packaging: the wheel and source archive build, pass `twine check --strict`, install into a
-  clean virtual environment, and the Lean project that `nondim init-lean` copies out of the
-  installed wheel builds completely.
-* **Not yet exercised:** the GitHub Actions workflows (templates in `scripts/workflows/`; they
-  first run after the owner copies them into `.github/` and pushes) and any real upload to
-  GitHub or PyPI.
+* `python -m pytest -q`: **675 tests pass** (633 Python/bridge/packaging + 42 that call Lean).
+  Without desr installed: 613 pass and 3 skip (the desr test module and two Lean tests).
+* `lake build`: **passes** with Lean 4.35.0 / Mathlib v4.35.0 (2493 jobs): the general theory
+  (`System`, `Criterion`, `BuckinghamPi`, `Reduction`), 13 certificates in the general form
+  (6 from desr, 7 from this package's solver), the 6 matrix-level certificates of the first
+  release, `Basic`, `Theory`, `SIR`, and 10 Lean test files. No `sorry` outside
+  `Exercises.lean`; `#print axioms` on 36 theorems shows only Lean's three standard axioms.
+* Where this was run: the numbers above are from the assistant's cloud workspace, with desr
+  3.0.0 installed from source. Natively on the Mac (2026-11-13, branch `general-theory`,
+  Python 3.13): `lake build` passes (2493 jobs) and `python -m pytest -q` gives 613 passed,
+  3 skipped. desr was not installed in that run, so **the tests that need desr (60 in Python,
+  2 with Lean) have been run only in the cloud workspace**.
+* Packaging: unchanged from 0.1.0; the new Lean files are bundled with the wheel through the
+  existing directory rule, and `test_wheel_contains_…` still passes.
+* **Not yet exercised:** the GitHub Actions workflows with the new desr step (template in
+  `scripts/workflows/ci.yml`), and any release after 0.1.0.
 
 ---
 
@@ -197,6 +200,8 @@ equally good fits while invariant groups agree to <1%; loss is flat (<1e-6) alon
 **Why.** Mathlib changes weekly; `eval_rank` is recent. Pinning makes results reproducible.
 
 ### D15. What is and is not verified (the verification gap)
+*Updated after D23–D31; items 3 and 4 of the original list are now closed.*
+
 Verified by Lean, per model: checks 1–8 in the README table, plus constraint verdicts.
 Verified by Lean, in general: `monomial_scale`, `finrank_scalingSpace`, `maximal_of_rank`,
 and for SIR the two-way correspondence of solutions and equilibria and the R₀ threshold.
@@ -206,10 +211,15 @@ and for SIR the two-way correspondence of solutions and equilibria and the R₀ 
 2. that the exporter printed the same model the solver analysed. Mitigation: [tested]
    `test_lean_export.py` re-parses every certificate with an independent reader and re-checks
    every theorem, and `test_certificates_on_disk_are_up_to_date` catches stale files;
-3. the general rank criterion (D7) and the ℤ-vs-ℚ rank bridge (Exercises);
-4. solution correspondence for models other than SIR (only the right-hand-side identity);
+3. ~~the general rank criterion (D7)~~ now [proved]: `normalizable_iff_rank` (D25);
+4. ~~solution correspondence for models other than SIR~~ now [proved] for every polynomial
+   system (`IsSymmetry.solution_iff`, D24), and the reduced equations for every model with a
+   general-form certificate (`reduction_correct`, D28). Models with unit links or rational
+   right-hand sides still have only the right-hand-side identity;
 5. anything numerical: floating point, ODE solvers, fits;
-6. that a reduction is *useful* (interpretable, right small parameter).
+6. that a reduction is *useful* (interpretable, right small parameter);
+7. that the exponent matrix used for "no scaling was missed" is the model's: it is still a
+   literal printed by Python (D29).
 
 ---
 
@@ -278,6 +288,102 @@ archive. It stays on disk.
 
 ---
 
+## General theory and desr (after 0.1.0)
+
+Guides: `docs/THEORY.md` (the theorems) and `docs/DESR.md` (certifying desr).
+
+### D23. Certify desr instead of competing with it
+**Decision.** Add an adapter that runs desr and turns its output into a Lean certificate;
+keep this package's solver as a second, independent implementation held to the same theorems.
+**Reason.** desr is the reference implementation of [HL13]/[T25] and is more general than our
+solver (initial conditions, three reduction schemes, large models). A second solver adds
+little; a proof that the reference tool's answer is right adds something no tool in this area
+offers. Two independent implementations that must agree are also a strong test of both.
+**Evidence.** [tested] `test_desr_and_our_solver_agree`, `test_random_models_desr_and_our_solver_agree`
+(59 random models in scope, all agree); [proved] `Certified/Desr/*.lean`.
+[literature] a web search for proof-assistant verification of nondimensionalization or of
+scaling-symmetry reduction of ODEs found none; this is a limited search, not a survey.
+
+### D24. A model is data (`LaurentSystem`), and symmetry is decided from the data
+**Decision.** Represent a system as lists of terms (coefficient, integer exponent vector), not
+as Lean functions. Each certificate proves the data evaluates to the written equation.
+**Reason.** With data, "is this scaling a symmetry?" is a finite computation Lean decides
+itself (`decide`), so the symmetry claim no longer depends on an exponent matrix supplied by
+Python, and the general theorems can quantify over all systems. Integer exponents (Laurent
+terms) cover every in-scope model, including ones with division by a state.
+**Cost.** Rational right-hand sides do not fit and keep their 0.1.0 certificates.
+**Evidence.** [proved] `IsSymmetry.map_solution`, `solution_iff`; [tested]
+`test_terms_rebuild_the_equations_exactly`, `test_symmetry_can_be_rechecked_from_the_lean_text`,
+mutations `data_is_not_the_equation_*`.
+
+### D25. The constraint criterion as an equivalence, with certificates for both answers
+**Decision.** Prove "yes" from a left inverse `G·A_S = d·1`, "no" from a kernel vector, and
+that one of the two always exists; conclude `normalizable_iff` and `normalizable_iff_rank`.
+**Reason.** A left inverse or kernel vector is checked by one integer matrix product, which is
+cheaper and more transparent than a rank computation, and both are explicit witnesses a reader
+can inspect. The dichotomy turns two implications into the equivalence D7 relied on. `d ≠ 1`
+covers scalings that need roots, which unimodular (Hermite) methods cannot express.
+**Evidence.** [proved] `exists_normalizing_scaling`, `not_normalizable_of_kernel_vector`,
+`left_inverse_or_kernel`, `normalizable_iff_rank`; Limits §3–§5 show each hypothesis is needed.
+[synthesis] the statement and proof are ours; the underlying fact is standard linear algebra.
+
+### D26. Buckingham Pi in the form "unit-independent ⟹ function of the groups"
+**Decision.** Prove the theorem for arbitrary functions on positive quantities, with the
+spanning hypothesis dischargeable from integer identities (`spans_kernel_of_certificate`).
+**Reason.** The counting half (number of groups = n − rank) is what tools compute; the
+half about functions is what users rely on when they say the reduced model "loses nothing".
+[literature] [B25] sets up dimensions in Lean 4 and states that it implements the theorem; from
+its abstract and text this is the counting/kernel side. [BJ23] treats the theorem in a
+dependently typed language and discusses why the textbook statement is not constructive. Two
+web searches found no Lean proof of the function half. Not checked against the PDFs line by
+line: verify before claiming priority.
+**Evidence.** [proved] `buckingham_pi`, `buckingham_pi_factorization`; [tested] the pendulum
+(`mass_is_irrelevant`), Limits §6–§8.
+
+### D27. Parameters are constant: proved, not assumed
+**Decision.** Derive constancy of parameters from the system (zero derivative ⟹ constant).
+**Reason.** An assumed hypothesis is one more thing a reader must trust. Cost: ten more Mathlib
+modules (mean value theorem) in the import closure.
+**Evidence.** [proved] `IsSolution.param_const`.
+
+### D28. State the reduced equations for the tool's own variables along the original solution
+**Decision.** `reduction_correct` says: along every positive solution of the original system,
+the tool's new variables, in the tool's new time, satisfy the tool's reduced equations. The
+cross-section statement is kept as a separate theorem (`cross_section`).
+**Reason.** The first format stated the reduced equations on the cross-section. That coincides
+with the tool's variables for all textbook models and fails in general (D31). The new statement
+is the claim the tool actually makes and needs one identity per equation.
+**Evidence.** [proved] `IsSolution.hasDerivAt_newVariable`; [tested]
+`test_regression_invariants_that_are_not_cross_section_coordinates`; Limits §10.
+
+### D29. Scope of the first version, and how limits are reported
+**Decision.** Support desr's "parameter" scheme on autonomous polynomial systems without unit
+links. Everything else raises `NotSupported` with a reason and appears in the comparison table.
+**Reason.** In the parameter scheme each new state variable is one state times parameters,
+which is what D28's theorem needs. Unit links need initial conditions passed to desr and a
+Lean notion of "same units"; both are possible and neither is small.
+**Known gap.** "No scaling was missed" uses a literal exponent matrix (D15 item 7).
+**Evidence.** [tested] `test_unsupported_models_are_refused_with_a_reason`,
+`test_edge_models_are_refused_with_a_reason`, `test_compare_never_raises_on_any_builtin_model`.
+
+### D30. desr is an optional dependency installed from source
+**Decision.** No entry in `pyproject.toml`; the commands print the install line and the tests
+skip when desr is missing.
+**Reason.** desr is not on PyPI, and PyPI rejects packages whose metadata depends on a direct
+URL. Pinning a commit in documentation (`deff1c0`, version 3.0.0) keeps results reproducible.
+**Evidence.** [tested] the suite passes without desr (613 passed, 3 skipped, natively) and
+with it (675, cloud workspace).
+
+### D31. Three things the tests found
+1. **A too-narrow certificate format** (D28): random model 21 has a correct desr answer the
+   first format could not certify. Found by `test_random_models_desr_and_our_solver_agree`.
+2. **desr reports an all-zero scaling** for a model with no symmetry (`dx/dt = 1 − x`). The
+   adapter uses the rank. `test_desr_reports_a_zero_scaling_for_a_model_without_symmetry`.
+3. **A parameter that appears only in an output** never reaches desr; the adapter refuses.
+These are recorded because each was invisible on the hand-picked models (compare D17).
+
+---
+
 ## Sources
 
 * **[HL13]** E. Hubert, G. Labahn. "Scaling invariants and symmetry reduction of dynamical
@@ -288,6 +394,12 @@ archive. It stays on disk.
   polynomial/CRN models; not used in the code). https://arxiv.org/abs/2611.04127
 * **[B25]** Bobbin, Jones, Velkey, Josephson. "Formalizing dimensional analysis using the Lean
   theorem prover." arXiv:2509.13142, 2025. https://arxiv.org/abs/2509.13142
+* **[BJ23]** N. Botta et al. "Types, equations, dimensions and the Pi theorem." arXiv:2308.09481
+  (dimensional analysis and the Pi theorem in a dependently typed setting). https://arxiv.org/abs/2308.09481
+* **[HS06]** É. Hubert, A. Sedoglavic. "Polynomial Time Nondimensionalisation of Ordinary
+  Differential Equations via their Lie Point Symmetries." arXiv:cs/0604060, 2006. https://arxiv.org/abs/cs/0604060
+* **[DESR]** desr, version 3.0.0, commit `deff1c066198befb3454db45c9e802c266ab19ed`, Apache-2.0.
+  https://github.com/ofloveandhate/desr
 * **[TAO]** T. Tao, `Analysis/Misc/UnitsSystem.lean`. https://github.com/teorth/analysis/blob/main/Analysis/Misc/UnitsSystem.lean
 * **[ML]** Mathlib documentation: tactics https://leanprover-community.github.io/mathlib4_docs/tactics.html ;
   rank–nullity https://leanprover-community.github.io/mathlib4_docs/Mathlib/LinearAlgebra/FiniteDimensional/Lemmas.html
