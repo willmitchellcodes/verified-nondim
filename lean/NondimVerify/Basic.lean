@@ -81,4 +81,73 @@ theorem monomial_scale {r n : ℕ} (A : Matrix (Fin r) (Fin n) ℤ) (lam : Fin r
         rw [show (A *ᵥ k) j = ∑ i, A j i * k i from rfl, zpow_sum_of_ne_zero _ (hlam j)]
     _ = 1 := by simp [hk]
 
+/-- **Weighted scaling lemma.** Scaling multiplies the monomial with exponents `k` by
+`∏ j, lam j ^ (A *ᵥ k) j`: the vector `A *ᵥ k` lists the *weights* of the monomial under each
+scaling. (`monomial_scale` is the special case where all weights are zero.) -/
+theorem monomial_scale_eq {r n : ℕ} (A : Matrix (Fin r) (Fin n) ℤ) (lam : Fin r → ℝ)
+    (hlam : ∀ j, lam j ≠ 0) (x : Fin n → ℝ) (k : Fin n → ℤ) :
+    monomial (scale A lam x) k = (∏ j, lam j ^ (A *ᵥ k) j) * monomial x k := by
+  unfold monomial scale
+  simp_rw [mul_zpow, Finset.prod_mul_distrib]
+  rw [mul_comm]
+  congr 1
+  calc ∏ i, (∏ j, lam j ^ A j i) ^ k i
+      = ∏ i, ∏ j, lam j ^ (A j i * k i) := by
+        refine Finset.prod_congr rfl fun i _ => ?_
+        rw [← Finset.prod_zpow]
+        refine Finset.prod_congr rfl fun j _ => ?_
+        rw [zpow_mul]
+    _ = ∏ j, ∏ i, lam j ^ (A j i * k i) := Finset.prod_comm
+    _ = ∏ j, lam j ^ (A *ᵥ k) j := by
+        refine Finset.prod_congr rfl fun j _ => ?_
+        rw [show (A *ᵥ k) j = ∑ i, A j i * k i from rfl, zpow_sum_of_ne_zero _ (hlam j)]
+
+/-! ## Monomials of monomials -/
+
+lemma monomial_pos {n : ℕ} (x : Fin n → ℝ) (hx : ∀ i, 0 < x i) (k : Fin n → ℤ) : 0 < monomial x k :=
+  Finset.prod_pos fun i _ => zpow_pos (hx i) _
+
+lemma monomial_add {n : ℕ} (x : Fin n → ℝ) (hx : ∀ i, x i ≠ 0) (k l : Fin n → ℤ) :
+    monomial x (k + l) = monomial x k * monomial x l := by
+  unfold monomial
+  rw [← Finset.prod_mul_distrib]
+  exact Finset.prod_congr rfl fun i _ => zpow_add₀ (hx i) _ _
+
+lemma monomial_single {n : ℕ} (x : Fin n → ℝ) (p : Fin n) :
+    monomial x (fun i => if i = p then 1 else 0) = x p := by
+  unfold monomial
+  rw [Finset.prod_eq_single p]
+  · simp
+  · intro i _ hne; simp [hne]
+  · intro h; exact absurd (Finset.mem_univ _) h
+
+/-- A monomial in monomials is a monomial: exponents compose by the matrix–vector product. -/
+theorem monomial_monomial {n m : ℕ} (V : Matrix (Fin n) (Fin m) ℤ) (x : Fin n → ℝ)
+    (hx : ∀ i, x i ≠ 0) (k : Fin m → ℤ) :
+    monomial (fun j => monomial x fun i => V i j) k = monomial x (V *ᵥ k) := by
+  unfold monomial
+  calc ∏ j, (∏ i, x i ^ V i j) ^ k j
+      = ∏ j, ∏ i, x i ^ (V i j * k j) := by
+        refine Finset.prod_congr rfl fun j _ => ?_
+        rw [← Finset.prod_zpow]
+        exact Finset.prod_congr rfl fun i _ => by rw [zpow_mul]
+    _ = ∏ i, ∏ j, x i ^ (V i j * k j) := Finset.prod_comm
+    _ = ∏ i, x i ^ (V *ᵥ k) i := by
+        refine Finset.prod_congr rfl fun i _ => ?_
+        rw [show (V *ᵥ k) i = ∑ j, V i j * k j from rfl, zpow_sum_of_ne_zero _ (hx i)]
+
+/-- A monomial only looks at the coordinates where its exponent is nonzero. -/
+lemma monomial_congr_of_support {n : ℕ} (x x' : Fin n → ℝ) (k : Fin n → ℤ)
+    (h : ∀ i, k i ≠ 0 → x i = x' i) : monomial x k = monomial x' k := by
+  unfold monomial
+  refine Finset.prod_congr rfl fun i _ => ?_
+  by_cases hk : k i = 0
+  · simp [hk]
+  · rw [h i hk]
+
+lemma exp_zpow (x : ℝ) (m : ℤ) : Real.exp x ^ m = Real.exp (m * x) := by
+  obtain ⟨k, rfl | rfl⟩ := m.eq_nat_or_neg
+  · simp [Real.exp_nat_mul]
+  · simp [Real.exp_nat_mul, Real.exp_neg]
+
 end NondimVerify

@@ -89,10 +89,17 @@ theorem constraint2_unsat : 3 > Acand2.rank := by have h := constraint2_rank; om
 
 The Python code is never trusted: if it were wrong, the Lean build would fail.
 
+## Check desr, too
+
+[desr](https://github.com/ofloveandhate/desr) is the reference tool for this algorithm.
+`nondim desr lotka_volterra` runs it, compares it with the solver above, and `nondim certify`
+turns its answer into Lean theorems: its scalings are symmetries, and along every positive
+solution its new variables satisfy its reduced equations.
+
 ## More
 
 - `nondim tour` walks through all of this in seven steps; `nondim list` shows the built-in models.
-- [Guide](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/GUIDE.md) · [the math by hand](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/BACKGROUND.md) · [design decisions and sources](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/DECISIONS.md) · [testing](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/TESTING.md) · [examples](https://github.com/willmitchellcodes/verified-nondim/tree/main/examples/)
+- [Guide](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/GUIDE.md) · [the general theorems](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/THEORY.md) · [certifying desr](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/DESR.md) · [the math by hand](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/BACKGROUND.md) · [design decisions and sources](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/DECISIONS.md) · [testing](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/TESTING.md) · [examples](https://github.com/willmitchellcodes/verified-nondim/tree/main/examples/)
 - Scope: right-hand sides built from products, quotients and sums of powers (no `exp` or `log`).
   Results are verified relative to the equations and unit links you supply.
 
