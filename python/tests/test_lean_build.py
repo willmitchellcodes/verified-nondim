@@ -143,13 +143,84 @@ def test_general_mutations_really_change_the_certificate():
         assert _replace_once(base, pattern, repl) != base, name
 
 
+# ----------------------------------------------------------------- the optional sections and rational models
+
+def _own_text(key, module):
+    from nondim import lean_export2
+    from nondim.catalog import CATALOG
+    from nondim.cli import own_reduction
+    return lean_export2.certificate(own_reduction(key), module, CATALOG[key].get("constraints"))
+
+
+SECTION_MUTATIONS = {
+    # name: (model, regex, replacement). Each breaks exactly one claim of one optional section.
+    "link_that_a_scaling_breaks": ("sir", r"(def Links .*?!!\[)1, 0;", r"\g<1>1, 1;"),
+    "overclaimed_parameter_rank": ("sir", r"ParamCols\.rank = 2", "ParamCols.rank = 1"),
+    "claim_that_two_cannot_be_removed": ("sir", r"cannot_remove_more \(S : Fin 3 → Fin 3\)",
+                                         "cannot_remove_more (S : Fin 2 → Fin 3)"),
+    "parameter_columns_misreported": ("sir", r"(def ParamCols .*?!!\[)1, 0, -1;", r"\g<1>0, 0, -1;"),
+    "goal_possible_with_a_wrong_certificate": ("sir", r"(def goal1_G .*?!!\[)1, 1;", r"\g<1>1, 0;"),
+    "goal_possible_for_a_dependent_set": ("sir", r"def goal1_S : Fin 2 → Fin 6 := !\[4, 5\]",
+                                          "def goal1_S : Fin 2 → Fin 6 := ![3, 3]"),
+    "goal_impossible_claimed_for_a_dimensionless_group": (
+        "sir", r"monomial_not_invariant A !\[0, 0, 0, 1, 0, 1\]", "monomial_not_invariant A ![0, 0, 0, 1, -1, 1]"),
+    "goal_impossible_by_an_understated_rank": ("sir", r"goal2_cols\.rank = 2", "goal2_cols.rank = 1"),
+    "dimensionless_claimed_for_a_group_with_units": (
+        "sir", r"goal4_R0_dimensionless : A \*ᵥ !\[0, 0, 0, 1, -1, 1\]",
+        "goal4_R0_dimensionless : A *ᵥ ![0, 0, 0, 1, 0, 1]"),
+    "output_scaling_that_is_not_a_symmetry": ("sir_reported", r"(def B .*?!!\[)-1, -1, 1, 0, 1", r"\g<1>-1, 0, 1, 0, 1"),
+    "output_scaling_that_changes_the_data": ("sir_reported", r"(def B .*?!!\[)-1, -1, 1, 0, 1", r"\g<1>-1, -1, 1, 0, 0"),
+    "output_data_is_not_the_output": ("sir_reported", r"(def out_y .*?⟨1, !\[0, 1, 0, 0), 1\]", r"\g<1>, 0]"),
+    "identifiability_claimed_for_an_unmoved_parameter": (
+        "sir_reported", r"outputs_unchanged 2 0 \(by decide\)", "outputs_unchanged 3 0 (by decide)"),
+    "rational_denominator_changed": ("rosenzweig_macarthur",
+                                     r"(def den_N_1 .*?⟨1, !\[1, 0, 0, 0, 1, 1), 0, 0\]", r"\g<1>, 1, 0]"),
+    "rational_reduced_numerator_sign": ("rosenzweig_macarthur", r"(def rnum_N_1 .*?:= )\(\(-1\) \* ", r"\g<1>("),
+    "rational_reduced_denominator_wrong": ("rosenzweig_macarthur", r"(def rden_P_1 .*?:= )\(1 \+ ", r"\g<1>(2 + "),
+    "rational_data_is_not_the_equation": ("rosenzweig_macarthur", r"(def num_P_1 .*?)⟨1, ", r"\g<1>⟨3, "),
+}
+
+
+@pytest.mark.parametrize("key", ["sir", "sir_reported", "rosenzweig_macarthur", "michaelis_menten_ic"])
+def test_certificate_with_optional_sections_is_accepted(lake, key):
+    ok, log = lean_accepts(lake, _own_text(key, "Sections"), "sections_" + key)
+    assert ok, log[-3000:]
+
+
+@pytest.mark.parametrize("name", list(SECTION_MUTATIONS))
+def test_corrupted_section_is_rejected(lake, name):
+    key, pattern, repl = SECTION_MUTATIONS[name]
+    bad = _replace_once(_own_text(key, "SectionMutant"), pattern, repl)
+    ok, log = lean_accepts(lake, bad, "s_" + name)
+    assert not ok, f"Lean ACCEPTED a certificate with the defect '{name}'"
+    assert "error" in log
+
+
+def test_section_mutations_really_change_the_certificate():
+    for name, (key, pattern, repl) in SECTION_MUTATIONS.items():
+        base = _own_text(key, "SectionMutant")
+        assert _replace_once(base, pattern, repl) != base, name
+
+
 EDGE_MODELS = {
     "negative_exponent": ({"x": "a - b*x/y", "y": "c - d*y"}, "a b c d"),
     "fractional_coefficients": ({"x": "a*x/2 - b*x**2/3"}, "a b"),
     "one_scaling_only": ({"x": "a - x"}, "a"),
     "higher_powers": ({"x": "a*x**2*y - b*x", "y": "c*y - d*x**2*y**2"}, "a b c d"),
     "cubic_one_state": ({"x": "a*x**2 - b*x**3"}, "a b"),
+    "holling_type_two": ({"x": "a*x/(1 + b*x) - c*x"}, "a b c"),
+    "hill_exponent_two": ({"x": "a*x**2/(K**2 + x**2) - c*x"}, "a K c"),
+    "repression": ({"x": "a/(1 + b*y) - c*x", "y": "d*x - e*y"}, "a b c d e"),
 }
+
+
+HEADER = ("import NondimVerify.Reduction\nimport NondimVerify.Criterion\nimport NondimVerify.Identifiability\n"
+          "import NondimVerify.Rational\nimport NondimVerify.Theory")
+
+
+def _body(text: str) -> str:
+    """A certificate without its import lines, so several fit in one Lean file."""
+    return "\n".join(line for line in text.split("\n") if not line.startswith("import "))
 
 
 def test_edge_models_are_accepted_in_the_general_form(lake):
@@ -160,11 +231,10 @@ def test_edge_models_are_accepted_in_the_general_form(lake):
     from nondim.model import Model
     from nondim.scaling import nondimensionalize
 
-    parts = ["import NondimVerify.Reduction\nimport NondimVerify.Theory"]
+    parts = [HEADER]
     for name, (eqs, params) in EDGE_MODELS.items():
         red = from_nondim(nondimensionalize(Model.from_strings(name, eqs, params)))
-        text = lean_export2.certificate(red, f"Edge.{name}")
-        parts.append(text.replace("import NondimVerify.Reduction\nimport NondimVerify.Theory\n", "", 1))
+        parts.append(_body(lean_export2.certificate(red, f"Edge.{name}")))
     ok, log = lean_accepts(lake, "\n".join(parts), "edge")
     assert ok, log[-4000:]
 
@@ -193,10 +263,9 @@ def test_desr_on_models_nobody_hand_picked_is_accepted(lake):
         except NotSupported:
             pass
     assert len(reds) >= 9
-    parts = ["import NondimVerify.Reduction\nimport NondimVerify.Theory"]
+    parts = [HEADER]
     for i, red in enumerate(reds):
-        text = lean_export2.certificate(red, f"Rand.M{i}")
-        parts.append(text.replace("import NondimVerify.Reduction\nimport NondimVerify.Theory\n", "", 1))
+        parts.append(_body(lean_export2.certificate(red, f"Rand.M{i}")))
     ok, log = lean_accepts(lake, "\n".join(parts), "random_desr")
     assert ok, log[-4000:]
 
@@ -230,6 +299,19 @@ KEY_THEOREMS = [
     "NondimVerify.eq_reconstruct_of_section", "NondimVerify.LaurentSystem.IsSymmetry.reduction",
     "NondimVerify.LaurentSystem.IsSymmetry.reduction_of_parameters",
     "NondimVerify.LaurentSystem.IsSolution.hasDerivAt_newVariable",
+    "NondimVerify.IsHomogeneous.poly_scale_eq_zero_iff", "NondimVerify.OutputInvariant.poly_scale",
+    "NondimVerify.LaurentSystem.IsSymmetry.not_identifiable", "NondimVerify.LaurentSystem.IsSymmetry.not_identifiable'",
+    "NondimVerify.monomial_not_invariant", "NondimVerify.not_normalizable_of_rank_lt",
+    "NondimVerify.RatSystem.IsSymmetry.map_solution", "NondimVerify.RatSystem.IsSymmetry.solution_iff",
+    "NondimVerify.RatSystem.IsSymmetry.reduction_of_parameters",
+    "NondimVerify.RatSystem.IsSolution.hasDerivAt_newVariable", "NondimVerify.frac_reduce",
+    "NondimVerify.Certified.Own.SIR.reduction_correct", "NondimVerify.Certified.Own.SIR.cannot_remove_more",
+    "NondimVerify.Certified.Own.SIR.goal2_impossible", "NondimVerify.Certified.Own.SIRReported.not_identifiable_beta",
+    "NondimVerify.Certified.Own.RosenzweigMacArthur.reduction_correct",
+    "NondimVerify.Certified.Desr.RosenzweigMacArthur.reduction_correct",
+    "NondimVerify.Certified.ODEbase.BIOMD0000000484.reduction_correct",
+    "NondimVerifyTest.Limits.a_not_identifiable", "NondimVerifyTest.Limits.slope_identifiable",
+    "NondimVerifyTest.Identifiability.gain_not_identifiable",
     # certificates in the general form
     "NondimVerify.Certified.Own.SIRNoN.reduction_correct", "NondimVerify.Certified.Own.LotkaVolterra.cross_section",
     "NondimVerify.Certified.Desr.SIRNoN.reduction_correct", "NondimVerify.Certified.Desr.LotkaVolterra.reduction_correct",

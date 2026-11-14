@@ -12,9 +12,22 @@
   desr is optional and installed from source.
 - **Certificates in the general form** for seven models: the reduced equations are proved for
   every positive solution of the original system, not only as an identity of right-hand sides.
-- **Tests**: 675 (was 471), including 18 more corrupted certificates Lean must reject, a Lean
-  file showing every hypothesis of the general theorems is needed, and a random-model
-  comparison of desr with this package's solver.
+- **Unit links and conservation laws** in the general theory: SIR with `N` is certified with
+  `R0` as the surviving parameter.
+- **Identifiability**: a proved one-way theorem (an output-preserving scaling hides the
+  parameters it moves) with Lean counterexamples showing it is one-way; certificates for models
+  with outputs.
+- **Goal queries** answered with Lean proofs both ways, and a certified minimal parameter count
+  in every certificate.
+- **Rational right-hand sides** (`RatSystem`): Rosenzweig–MacArthur certified for this package
+  and for desr.
+- **ODEbase pilot** (`nondim audit`, `docs/ODEBASE.md`): scaling symmetries of 162 published
+  polynomial BioModels systems; ten of them with Lean certificates.
+- **Teaching notebook**: `examples/walkthrough.ipynb`.
+- **Tests**: 847 (471 at 0.1.0), including 35 more corrupted certificates Lean must reject, a
+  Lean file of 14 counterexamples showing every hypothesis of the general theorems is needed,
+  a random-model comparison of desr with this package's solver, and a parser that refuses
+  code-like input from third-party model files.
 
 ## 0.1.0 — 2026-11-13
 

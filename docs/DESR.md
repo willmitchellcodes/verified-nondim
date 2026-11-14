@@ -15,7 +15,8 @@ cd lean && lake build             # Lean checks them
 ```
 
 Without desr installed everything else works; the desr commands say how to install it and the
-desr tests skip. Tested against desr 3.0.0 (commit `deff1c0`, Apache-2.0).
+desr tests skip. Tested against desr 3.0.0 (commit `deff1c0`, Apache-2.0). Rational right-hand
+sides are supported: Rosenzweig–MacArthur is certified for desr and for this package.
 
 ## The pipeline
 
@@ -32,7 +33,7 @@ desr tests skip. Tested against desr 3.0.0 (commit `deff1c0`, Apache-2.0).
 | run desr | `nondim/desr_bridge.py` `to_desr`, `from_desr` | the model is rebuilt with desr's own classes; desr returns its scaling matrix, Hermite multiplier `V`, its inverse `W`, and the reduced system |
 | neutral form | `nondim/hlform.py` `HLReduction` | time is separated from the other variables; `V` is split into auxiliary columns `Vi` and invariant columns `Vn`; a left-inverse certificate `G, d` is computed |
 | check in Python | `HLReduction.check()` | every relation the Lean file will state is re-derived in exact arithmetic first, so a failure is reported with a readable reason |
-| write Lean | `nondim/lean_export2.py` `certificate` | the theorems listed in `docs/THEORY.md` §6 |
+| write Lean | `nondim/lean_export2.py` `certificate` | the theorems listed in `docs/THEORY.md` §10 |
 | check in Lean | `lake build` | the only step that counts as proof |
 
 The same `HLReduction` is produced from this package's solver (`from_nondim`), so both tools
@@ -67,15 +68,19 @@ Point 4 is desr's actual claim, stated about the model's own solutions.
 | SIR without `N` | 2 | 2 / 2 | 0 / 0 | yes | certified |
 | Lotka–Volterra | 4 | 3 / 3 | 1 / 1 | yes | certified |
 | Michaelis–Menten | 4 | 2 / 2 | 2 / 2 | yes | certified |
+| Rosenzweig–MacArthur (rational) | 6 | 3 / 3 | 3 / 3 | yes | certified |
 | spurious (original) | 2 | 1 / 1 | 1 / 1 | yes | certified |
 | spurious (substituted) | 2 | 2 / 2 | 0 / 0 | yes | certified |
-| SIR with `N`, Michaelis–Menten with `s₀`, spurious (fixed) | | | | | not yet: unit links |
+| SIR with `N`, Michaelis–Menten with `s₀`, spurious (fixed) | | | | | certified for our solver only: unit links are not passed to desr yet |
 | SIR with reporting rate `ρ` | 3 | | | | not passed to desr: `ρ` is not in the equations |
-| Rosenzweig–MacArthur | 6 | | | | not yet: rational right-hand side |
 
 "Same scalings" means the two scaling matrices have the same row space. The two tools may
 pick, order and name the invariants differently; that is a free choice, and each tool's choice
 is certified in its own file.
+
+On published models: the ODEbase pilot (`docs/ODEBASE.md`) gave desr the 25 small polynomial
+BioModels systems without conservation laws that fit the certificate format. The two tools
+agreed on all 25.
 
 A property test runs both tools on 120 randomly generated polynomial models. Whenever desr's
 answer is in scope (59 of the 120 with the fixed seed) it must pass every check, be maximal,
@@ -119,8 +124,8 @@ Out-of-scope inputs raise `NotSupported` with a reason. They are never mis-certi
 
 | Not supported yet | Message contains | Why |
 |---|---|---|
-| unit links (`same_units`) | "unit links" | not yet expressed in the general Lean theory; desr handles them through initial conditions, which the adapter does not pass yet |
-| rational right-hand sides | "polynomial" | `LaurentSystem` has monomial terms only |
+| unit links (`same_units`), for desr | "unit links" | desr handles them through initial conditions, which the adapter does not pass yet. This package's solver handles them and is certified (`docs/THEORY.md` §7) |
+| right-hand sides that are not quotients of polynomials (`exp`, roots) | "not a power of a model variable", "fractional" | outside both `LaurentSystem` and `RatSystem` |
 | time in the equations | "autonomous" | the theory is for `dx/dt = f(x)` |
 | desr's `dep_var` and `general` schemes | "scheme" | the new variables are then not "one state × parameters" (`docs/THEORY.md` §5b) |
 | no scaling symmetry | "no scaling symmetry" | nothing to reduce |
@@ -130,8 +135,9 @@ Out-of-scope inputs raise `NotSupported` with a reason. They are never mis-certi
 ## What is trusted, and what is not
 
 Not trusted: desr, SymPy, the adapter, the exporter. If any of them is wrong in a way that
-matters, a Lean theorem fails to compile. Eighteen corruptions of a certificate, one defect
-each, are all rejected (`test_corrupted_general_certificate_is_rejected`), and so is
+matters, a Lean theorem fails to compile. Thirty-five corruptions of a certificate, one defect
+each, are all rejected (18 of the core statements, 17 of the optional sections and rational
+models) (`test_corrupted_general_certificate_is_rejected`, `test_corrupted_section_is_rejected`), and so is
 a wrong reduced equation attributed to desr
 (`test_a_wrong_answer_attributed_to_desr_is_rejected`).
 
@@ -142,7 +148,7 @@ restates the model, the invariants and the reduced system in plain text.
 
 One statement is weaker than it looks: "no scaling was missed" compares desr with an exponent
 matrix printed by this package's Python (re-derived independently in a test), not one derived
-inside Lean. See `docs/THEORY.md` §7.
+inside Lean. See `docs/THEORY.md` §11.
 
 ## Adding a model
 

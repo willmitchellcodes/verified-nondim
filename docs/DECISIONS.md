@@ -13,21 +13,22 @@ Sources are listed in full at the end, keyed like [HL13].
 
 ## Status on 2026-11-13
 
-* `python -m pytest -q`: **675 tests pass** (633 Python/bridge/packaging + 42 that call Lean).
-  Without desr installed: 613 pass and 3 skip (the desr test module and two Lean tests).
-* `lake build`: **passes** with Lean 4.35.0 / Mathlib v4.35.0 (2493 jobs): the general theory
-  (`System`, `Criterion`, `BuckinghamPi`, `Reduction`), 13 certificates in the general form
-  (6 from desr, 7 from this package's solver), the 6 matrix-level certificates of the first
-  release, `Basic`, `Theory`, `SIR`, and 10 Lean test files. No `sorry` outside
-  `Exercises.lean`; `#print axioms` on 36 theorems shows only Lean's three standard axioms.
+* `python -m pytest -q`: **847 tests pass** (783 Python/bridge/packaging + 64 that call Lean).
+  Without desr installed: 782 pass and 3 skip (the desr test module and two Lean tests).
+* `lake build`: **passes** with Lean 4.35.0 / Mathlib v4.35.0 (2512 jobs): the general theory
+  (`System`, `Criterion`, `BuckinghamPi`, `Reduction`, `Rational`, `Identifiability`), 28
+  certificates in the general form (11 from this package's solver, 7 from desr, 10 for
+  published ODEbase models), the 6 matrix-level certificates of the first release, `Basic`,
+  `Theory`, `SIR`, and 12 Lean test files. No `sorry` outside `Exercises.lean`;
+  `#print axioms` on 57 theorems shows only Lean's three standard axioms.
 * Where this was run: the numbers above are from the assistant's cloud workspace, with desr
   3.0.0 installed from source. Natively on the Mac (2026-11-13, branch `general-theory`,
-  Python 3.13): `lake build` passes (2493 jobs) and `python -m pytest -q` gives 613 passed,
-  3 skipped. desr was not installed in that run, so **the tests that need desr (60 in Python,
-  2 with Lean) have been run only in the cloud workspace**.
+  Python 3.13, commit `d6547d3`): `lake build` passed (2493 jobs) and the suite gave 613
+  passed, 3 skipped, without desr. **Everything after that commit (D32–D39) has been built and
+  tested only in the cloud workspace**, as have all tests that need desr.
 * Packaging: unchanged from 0.1.0; the new Lean files are bundled with the wheel through the
   existing directory rule, and `test_wheel_contains_…` still passes.
-* **Not yet exercised:** the GitHub Actions workflows with the new desr step (template in
+* **Not yet exercised:** the GitHub Actions workflows with the desr step (template in
   `scripts/workflows/ci.yml`), and any release after 0.1.0.
 
 ---
@@ -214,8 +215,8 @@ and for SIR the two-way correspondence of solutions and equilibria and the R₀ 
 3. ~~the general rank criterion (D7)~~ now [proved]: `normalizable_iff_rank` (D25);
 4. ~~solution correspondence for models other than SIR~~ now [proved] for every polynomial
    system (`IsSymmetry.solution_iff`, D24), and the reduced equations for every model with a
-   general-form certificate (`reduction_correct`, D28). Models with unit links or rational
-   right-hand sides still have only the right-hand-side identity;
+   general-form certificate (`reduction_correct`, D28), which since D33 and D36 includes the
+   models with unit links and with rational right-hand sides;
 5. anything numerical: floating point, ODE solvers, fits;
 6. that a reduction is *useful* (interpretable, right small parameter);
 7. that the exponent matrix used for "no scaling was missed" is the model's: it is still a
@@ -357,6 +358,7 @@ is the claim the tool actually makes and needs one identity per equation.
 `test_regression_invariants_that_are_not_cross_section_coordinates`; Limits §10.
 
 ### D29. Scope of the first version, and how limits are reported
+*Superseded in part: unit links (for this package's solver) by D33, rational right-hand sides by D36.*
 **Decision.** Support desr's "parameter" scheme on autonomous polynomial systems without unit
 links. Everything else raises `NotSupported` with a reason and appears in the comparison table.
 **Reason.** In the parameter scheme each new state variable is one state times parameters,
@@ -371,8 +373,8 @@ Lean notion of "same units"; both are possible and neither is small.
 skip when desr is missing.
 **Reason.** desr is not on PyPI, and PyPI rejects packages whose metadata depends on a direct
 URL. Pinning a commit in documentation (`deff1c0`, version 3.0.0) keeps results reproducible.
-**Evidence.** [tested] the suite passes without desr (613 passed, 3 skipped, natively) and
-with it (675, cloud workspace).
+**Evidence.** [tested] the suite passes without desr (782 passed, 3 skipped) and with it (847),
+both in the cloud workspace; natively without desr at commit `d6547d3` (613 passed, 3 skipped).
 
 ### D31. Three things the tests found
 1. **A too-narrow certificate format** (D28): random model 21 has a correct desr answer the
@@ -381,6 +383,111 @@ with it (675, cloud workspace).
    adapter uses the rank. `test_desr_reports_a_zero_scaling_for_a_model_without_symmetry`.
 3. **A parameter that appears only in an output** never reaches desr; the adapter refuses.
 These are recorded because each was invisible on the hand-picked models (compare D17).
+
+---
+
+## After the literature search (2026-11-13)
+
+A literature search was run to answer "what would make this novel, or better, useful". Its
+report ranked seven directions. D32 records which were taken and why; D33–D38 record how.
+Guides: `docs/THEORY.md` §6–§9, `docs/ODEBASE.md`, `examples/walkthrough.ipynb`.
+
+### D32. Which directions were implemented
+| Direction from the search | Done? | Why |
+|---|---|---|
+| Certified audit of ODEbase | pilot (D37) | the clearest opening for an empirical contribution; a pilot shows the pipeline runs on real models |
+| Proved "scaling ⟹ non-identifiable" | yes (D34) | identifiability is the downstream use with real users, and the one-way nature can be proved, not just stated |
+| Goal-directed reductions with SAT/UNSAT certificates | algebraic part (D35) | "why can this not be done" is what existing tools do not explain |
+| Unit links, conservation laws, SIR with `R₀` | yes (D33) | needed for the course's central example |
+| Tanburn et al.'s change-of-variables theorem | **no** | its exact statement was not read; formalizing a paraphrase would be dishonest |
+| Rational right-hand sides | yes (D36) | most models in the course text and in BioModels are rational |
+| Lean-native `#nondim` command | **no** | the search rated it small marginal value |
+| Cross-check with StructuralIdentifiability.jl | **no** | needs Julia; recorded as the next step for D34 |
+| Teaching notebook | yes (D38) | the right course deliverable |
+**Evidence.** [literature] the search report (summarized in `docs/CONTRIBUTIONS.md`); its own
+caveats apply: about twenty searches, several sources read through abstracts.
+
+### D33. Unit links as invariant ratios; conservation laws as homogeneous relations
+**Decision.** A link "`a` is measured like `b`" is the exponent vector of `a/b`, and a
+certificate proves `A * Links = 0`. A polynomial relation is respected when it is homogeneous
+(`IsHomogeneous`, decidable), and then `poly_scale_eq_zero_iff` says scaling preserves it.
+**Reason.** Both are finite checks on exponents, so Lean decides them from the data; and they
+are the same condition, which lets the ODEbase importer turn laws into links without new theory.
+With links in the general form, SIR with `N` is certified with `R₀ = βN/γ` as the surviving
+parameter. [T25] is the source for why this matters (spurious reductions).
+**Evidence.** [proved] `IsHomogeneous.poly_scale_eq_zero_iff`, `Certified.Own.SIR.links_respected`;
+[tested] `test_every_scaling_respects_every_unit_link`, the SIR example in
+`NondimVerifyTest/Identifiability.lean` (a symmetry of the equations that breaks `S+I+R=N`).
+
+### D34. Identifiability: prove the one direction, and prove that it is only one direction
+**Decision.** Theorem `IsSymmetry.not_identifiable` (output-preserving, time-fixing scaling ⟹
+twin solution). Two Lean counterexamples fence it: a non-identifiable parameter no scaling
+moves (Limits §11), and an identifiable parameter moved by a scaling that rescales time
+(Limits §12).
+**Reason.** [CdB20] proposed testing identifiability by scalings; [VM21] showed it can miss
+non-identifiability, and the authors agreed it is a necessary condition only. A tool that
+states the sound direction and machine-checks its blind spot cannot be misread as a complete
+test. `Identifiable` is defined globally (all solutions, all times), which is stronger than the
+usual generic notion; the theorem is stated in the "every solution has a twin" form, which
+does not depend on that choice.
+**Evidence.** [proved] the theorem and both counterexamples; [tested]
+`test_identifiability_section_agrees_with_the_python_analysis`. [literature] no formalization
+of identifiability in a proof assistant was found (one search; low confidence).
+
+### D35. Every goal answered with a proof; the minimal parameter count
+**Decision.** Each request in the catalog becomes `goal<k>_possible` or `goal<k>_impossible`
+in the model's certificate, and every certificate proves `cannot_remove_more`.
+**Reason.** A "yes" with scale factors and a "no" with the obstruction are both checkable by
+a single matrix identity or rank, so the answer does not rest on the solver. The count is the
+statement users quote ("at least `p − ρ` parameters remain"); Hawi & Wechselberger [HW26]
+compute such counts, here it is proved per model.
+**Not done.** Non-algebraic goals (small parameters, variables of order one), which [HW26]'s
+tool addresses heuristically.
+**Evidence.** [proved] `not_normalizable_of_rank_lt`, `monomial_not_invariant`; [tested]
+`test_every_goal_gets_the_theorem_its_answer_calls_for`, nine goal mutations rejected by Lean.
+
+### D36. Rational systems as a second structure with the proofs repeated
+**Decision.** `RatSystem` (sums of quotients of polynomials) next to `LaurentSystem`. Only
+`rhs_scale` is new mathematics; the later theorems are textual copies of the polynomial ones.
+Certificates reduce each quotient with two division-free identities and `frac_reduce`.
+**Reason.** Abstracting both over "a vector field covariant under the scaling" is cleaner but
+would have touched every existing statement, certificate and test. Copying kept 675 passing
+tests untouched. No nonzero-denominator hypothesis is needed (division by zero is zero on
+both sides), which avoids asking generated proofs to show denominators positive.
+**Cost.** Duplicated proofs (about 150 lines) to be unified later; for rational models the
+equality between the quotient form and the tool's printed reduced equation is checked by
+SymPy, not Lean; the identifiability theorem is not yet stated for `RatSystem`.
+**Evidence.** [proved] `RatSystem.IsSymmetry.solution_iff`, `Certified.{Own,Desr}.RosenzweigMacArthur`;
+[tested] Holling II, Hill and repression models through Lean; four rational mutations rejected.
+
+### D37. The ODEbase pilot: read safely, store nothing, claim little
+**Decision.** Parse the model files with a whitelist arithmetic parser, never execute them;
+keep no model data in the repository; report coverage and failures alongside results; certify
+only the ten smallest models in Lean.
+**Reason.** The files are third-party Julia source, so evaluating them would run untrusted
+code. Statistics and ten certificates (each crediting its source) are enough to show the
+pipeline works on published models; the data stays with its maintainers. Results are in
+`docs/ODEBASE.md` with their limits (one solver, polynomial models, 28 files not analysed).
+**Evidence.** [tested] `tests/test_odebase.py` (code-like input refused; synthetic models in
+the same format); [proved] `Certified/ODEbase/*.lean`; desr agreed on 25 of 25 small models.
+
+### D38. A teaching notebook that is tested like code
+**Decision.** `examples/walkthrough.ipynb`: four course models, each with scalings, reduced
+model, a goal query or identifiability statement, and the Lean theorem. A test executes every
+code cell without Jupyter and checks the outputs the prose refers to.
+**Reason.** A notebook that silently stops matching the library is worse than none.
+**Evidence.** [tested] `tests/test_notebook.py`.
+
+### D39. What may be claimed about priority
+[literature] The search's verdict, with its stated confidence: the solution correspondence
+(medium), the rank criterion in this form (medium), Buckingham Pi in the forward direction
+(medium), the Hubert–Labahn reduction (medium–high) and checking desr (high that the technique
+is standard, medium that the domain is new) appear to be first formalizations of known results.
+It read [B25] through the paper and supplement rather than the repository, and did not cover
+every proof-assistant library. **Claim "to our knowledge, first machine-checked proofs";
+never "novel mathematics" and never "first" without that qualifier.** Certificate checking of
+computer-algebra output is an established pattern (Mathlib's `polyrith`, Isabelle's Smith
+normal form checker); the domain is what is new here.
 
 ---
 
@@ -398,6 +505,14 @@ These are recorded because each was invisible on the hand-picked models (compare
   (dimensional analysis and the Pi theorem in a dependently typed setting). https://arxiv.org/abs/2308.09481
 * **[HS06]** É. Hubert, A. Sedoglavic. "Polynomial Time Nondimensionalisation of Ordinary
   Differential Equations via their Lie Point Symmetries." arXiv:cs/0604060, 2006. https://arxiv.org/abs/cs/0604060
+* **[CdB20]** M. Castro, R. J. de Boer. "Testing structural identifiability by a simple scaling
+  method." *PLOS Computational Biology*, 2020. (Cited from the literature search; not re-read.)
+* **[VM21]** A. F. Villaverde, G. Massonis. "On testing structural identifiability by a simple
+  scaling method: relying on scaling symmetries can be misleading." *PLOS Computational Biology*
+  17(10): e1009032, 2021. (Cited from the literature search; not re-read.)
+* **[ODEbase]** C. Lüders, T. Sturm, O. Radulescu. "ODEbase: a repository of ODE systems for
+  systems biology." *Bioinformatics Advances*, 2022. https://odebase.org . Model files read from
+  https://github.com/yuvraj-singh-math/OscarODEbase (MIT licence).
 * **[DESR]** desr, version 3.0.0, commit `deff1c066198befb3454db45c9e802c266ab19ed`, Apache-2.0.
   https://github.com/ofloveandhate/desr
 * **[TAO]** T. Tao, `Analysis/Misc/UnitsSystem.lean`. https://github.com/teorth/analysis/blob/main/Analysis/Misc/UnitsSystem.lean

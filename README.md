@@ -94,7 +94,8 @@ The Python code is never trusted: if it were wrong, the Lean build would fail.
 [desr](https://github.com/ofloveandhate/desr) is the reference tool for this algorithm.
 `nondim desr lotka_volterra` runs it, compares it with the solver above, and `nondim certify`
 turns its answer into Lean theorems: its scalings are symmetries, and along every positive
-solution its new variables satisfy its reduced equations.
+solution its new variables satisfy its reduced equations. `nondim audit --fetch` runs the
+solver over 190 published BioModels systems ([what it found](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/ODEBASE.md)).
 
 ## More
 
