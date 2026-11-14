@@ -11,8 +11,9 @@ desr is not on PyPI. Install it with
 
     pip install git+https://github.com/ofloveandhate/desr
 
-Scope of this first version: desr's "parameter" reduction scheme (the usual one, where the
-scalings act through the parameters) on autonomous polynomial systems without unit links.
+Scope: desr's "parameter" reduction scheme (the usual one, where the scalings act through the
+parameters) on autonomous systems whose right-hand sides are polynomials or quotients of
+polynomials, without unit links.
 """
 
 from __future__ import annotations

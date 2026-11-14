@@ -13,7 +13,7 @@ Both tools are run on every built-in model. "Same scalings" means the two scalin
 | lotka_volterra | 4 | 3 / 3 | 1 / 1 | yes | `a*t, c/a, d*x/a, b*y/a` | |
 | michaelis_menten | 4 | 2 / 2 | 2 / 2 | yes | `e0*k1*t, k2/(e0*k1), km1/(e0*k1), c/e0, s/e0` | |
 | michaelis_menten_ic | 5 | 2 / — | 3 / — | — | — | models with unit links (same_units) are not passed to desr yet |
-| rosenzweig_macarthur | 6 | 3 / — | 3 / — | — | — | equation for N: -N*P*a/(N*a*h + 1) is not a monomial (factor 1/(N*a*h + 1) is not a power of a model variable |
+| rosenzweig_macarthur | 6 | 3 / 3 | 3 / 3 | yes | `K*a*e*t, K*a*h, m/(K*a*e), r/(K*a*e), N/K, P/(K*e)` | |
 | spurious_original | 2 | 1 / 1 | 1 / 1 | yes | `a*t, b/a, x` | |
 | spurious_substituted | 2 | 2 / 2 | 0 / 0 | yes | `c*t, c*x/b` | |
 | spurious_fixed | 2 | 1 / — | 1 / — | — | — | models with unit links (same_units) are not passed to desr yet |

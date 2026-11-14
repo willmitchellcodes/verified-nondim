@@ -50,6 +50,8 @@ class HLReduction:
     d: int
     invariant_symbols: list[sp.Symbol]  # names of the m invariants (columns of Vn)
     reduced_rhs: dict[sp.Symbol, sp.Expr]  # state -> its reduced equation, in the invariant symbols
+    links: list[list[int]] = field(default_factory=list)  # unit links: exponent vectors that must be invariant
+    link_exprs: list[sp.Expr] = field(default_factory=list)
     time_exponents: list[int] = field(default_factory=list)  # w: new time = (prod variables^w) * t
     state_col: dict[sp.Symbol, int] = field(default_factory=dict)  # state -> its column of Vn
     time_invariant: sp.Expr | None = None  # the new time, e.g. gamma*t (for reports)
@@ -95,6 +97,15 @@ class HLReduction:
         """Each variable's equation as a list of (coefficient, exponent vector) terms."""
         return system_terms(self.model, self.variables)
 
+    def fractions(self):
+        """Each variable's equation as a list of quotients (numerator terms, denominator terms)."""
+        return system_fractions(self.model, self.variables)
+
+    @property
+    def is_rational(self) -> bool:
+        """True when some equation has a denominator that is not a single monomial."""
+        return any(len(den) > 1 for fs in self.fractions() for _, den in fs)
+
     def time_factor(self) -> sp.Expr:
         """T, the monomial in the parameters with new time = T * t."""
         return sp.Mul(*[v ** e for v, e in zip(self.variables, self.time_exponents)])
@@ -123,15 +134,20 @@ class HLReduction:
         need(self.Vi.shape == (n, k) and self.Vn.shape == (n, m) and k + m == n, "V has the wrong shape")
         need(self.Wu.shape == (k, n) and self.Wd.shape == (m, n), "W has the wrong shape")
         # 1. symmetry, term by term, straight from the equations
-        for i, terms in enumerate(self.terms()):
-            for _, exps in terms:
-                w = self.A * sp.Matrix(exps)
-                need(all(w[j] + self.tau[j] == self.A[j, i] for j in range(r)),
-                     f"scaling is not a symmetry of the equation for {self.variables[i]}")
+        #    (numerator weight - denominator weight + time weight = weight of the variable)
+        for i, fracs in enumerate(self.fractions()):
+            for num, den in fracs:
+                for _, a in num:
+                    for _, b in den:
+                        w = self.A * (sp.Matrix(a) - sp.Matrix(b))
+                        need(all(w[j] + self.tau[j] == self.A[j, i] for j in range(r)),
+                             f"scaling is not a symmetry of the equation for {self.variables[i]}")
         # 2. unimodular pair, invariants, free auxiliaries
         need(self.Vi * self.Wu + self.Vn * self.Wd == sp.eye(n), "Vi*Wu + Vn*Wd != 1")
         need(self.A * self.Vn == sp.zeros(r, m), "a column of Vn is not invariant")
         need(self.d != 0 and self.G * (self.A * self.Vi) == self.d * sp.eye(k), "G*(A*Vi) != d*1")
+        need(all(self.A * sp.Matrix(g) == sp.zeros(r, 1) for g in self.links),
+             "a scaling breaks a unit link")
         # 3. auxiliaries involve parameters only
         params = set(self.parameters)
         need(all(self.Vi[i, j] == 0 or v in params for i, v in enumerate(self.variables) for j in range(k)),
@@ -224,6 +240,58 @@ def system_terms(model: Model, variables: list[sp.Symbol]) -> list[list[tuple[sp
     return out
 
 
+def _terms_of(expr: sp.Expr, variables: list[sp.Symbol], where: str) -> list[tuple[sp.Rational, list[int]]]:
+    terms = []
+    for term in sp.Add.make_args(sp.expand(expr)):
+        if term == 0:
+            continue
+        coeff, _ = term.as_coeff_Mul()
+        try:
+            exps = monomial_exponents(term, variables)
+        except OutOfScopeError as e:
+            raise NotSupported(f"{where}: {term} is not a monomial ({e}); the general theory covers "
+                               "right-hand sides that are quotients of polynomials") from e
+        if any(not sp.Rational(x).is_Integer for x in exps):
+            raise NotSupported(f"{where}: fractional exponent in {term}")
+        terms.append((sp.Rational(coeff), [int(x) for x in exps]))
+    return terms
+
+
+def system_fractions(model: Model, variables: list[sp.Symbol]):
+    """Each right-hand side as a sum of quotients of (Laurent) polynomials.
+
+    Returns, per variable, a list of (numerator terms, denominator terms). Addends with the same
+    denominator are merged; a denominator that is a single monomial is folded into the numerator,
+    so a polynomial system gives exactly one quotient per state, with denominator 1.
+    """
+    if model.t in set().union(*[f.free_symbols for f in model.rhs]):
+        raise NotSupported("the general theory covers autonomous systems (time must not appear in the equations)")
+    one = [(sp.Integer(1), [0] * len(variables))]
+    out = []
+    for v in variables:
+        if v not in model.states:
+            out.append([])
+            continue
+        groups: dict[sp.Expr, sp.Expr] = {}
+        for addend in sp.Add.make_args(sp.expand(model.rhs[model.states.index(v)])):
+            if addend == 0:
+                continue
+            num, den = sp.fraction(sp.together(addend))
+            den = sp.expand(den)
+            if len(sp.Add.make_args(den)) == 1:  # a monomial: keep it with the numerator
+                num, den = num / den, sp.Integer(1)
+            groups[den] = groups.get(den, 0) + num
+        fracs = []
+        for den in sorted(groups, key=lambda d: (d != 1, sp.default_sort_key(d))):
+            num_terms = _terms_of(groups[den], variables, f"equation for {v}")
+            if not num_terms:
+                continue
+            den_terms = one if den == 1 else _terms_of(den, variables, f"equation for {v}")
+            fracs.append((num_terms, den_terms))
+        out.append(fracs)
+    return out
+
+
 def left_inverse_certificate(B: sp.Matrix) -> tuple[sp.Matrix, int]:
     """Integer G and d != 0 with G * B = d * I, for B with independent columns."""
     k = B.shape[1]
@@ -241,13 +309,11 @@ def left_inverse_certificate(B: sp.Matrix) -> tuple[sp.Matrix, int]:
 def from_nondim(nd: Nondimensionalization) -> HLReduction:
     """Describe a reduction computed by this package's own solver in Hubert-Labahn form."""
     m, an = nd.model, nd.analysis
-    if m.extra_invariants:
-        raise NotSupported("models with unit links (same_units) are not yet expressed in the general Lean theory")
     if m.t in set().union(*[f.free_symbols for f in m.rhs]):
         raise NotSupported("the general theory covers autonomous systems (time must not appear in the equations)")
     if an.A.shape[0] == 0:
         raise NotSupported(f"{m.name} has no scaling symmetry: there is nothing to reduce")
-    system_terms(m, [*m.states, *m.params])  # polynomial right-hand sides only
+    system_fractions(m, [*m.states, *m.params])  # quotients of polynomials only
     if not nd.integer_exponents():
         raise NotSupported("the reduction uses fractional powers (the Hubert-Labahn form needs integer ones)")
     if len(nd.normalized) != an.A.shape[0] or not nd.fully_invariant():
@@ -276,8 +342,15 @@ def from_nondim(nd: Nondimensionalization) -> HLReduction:
     Pf = sp.Matrix([expvec(v, full) for v in [m.t, *kept]]).T
     Wf = V1f.row_join(Pf).inv()
     Df = sp.Matrix(tau).row_join(A)
+    links = []
+    for inv in m.extra_invariants:
+        e = monomial_exponents(inv, m.variables)
+        if e[col(m.t)] != 0 or any(not sp.Rational(x).is_Integer for x in e):
+            raise NotSupported(f"the unit link {inv} involves time or a fractional power")
+        links.append([int(e[col(v)]) for v in variables])
     red = HLReduction(
-        model=m, source="nondim", variables=variables, A=A, tau=tau,
+        model=m, source="nondim", variables=variables, A=A, tau=tau, links=links,
+        link_exprs=list(m.extra_invariants),
         Vi=Vi, Vn=Vn, Wu=W[:k, :], Wd=W[k:, :], G=G, d=d,
         invariant_symbols=[nd.new_symbol[v] for v in kept],
         reduced_rhs={z: g for z, g in zip(m.states, nd.reduced_rhs)},

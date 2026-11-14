@@ -17,8 +17,11 @@ The statements below paraphrase the Lean; the Lean files are the authority.
    (the iff)        (Pi theorem)
              \      /
             Reduction.lean      reduction to invariants · the reduced equations
+               |        \
+               |     Rational.lean        the same for quotients of polynomials
+               |     Identifiability.lean constraints · outputs · what scalings hide
                |
-            Certified/*.lean    one file per model and per tool (desr, or our solver)
+            Certified/*.lean    one file per model and per source (desr, our solver, ODEbase)
 ```
 
 ## 0. The setting
@@ -52,9 +55,8 @@ Changing units is exactly this.
 at every time.
 
 Scope, stated once: autonomous systems, right-hand sides that are sums of monomials with
-integer exponents, solutions defined for all time, positive values where a theorem divides or
-takes logarithms. Rational right-hand sides (Rosenzweig–MacArthur) are outside this part and
-stay with the first release's matrix-level certificates.
+integer exponents (§1–§5) or sums of quotients of such polynomials (§6), solutions defined for
+all time, positive values where a theorem divides or takes logarithms.
 
 ---
 
@@ -163,13 +165,16 @@ equal groups give equal values, and `f = F ∘ piGroups P` for some `F`.
 matrix is a combination of its rows (a dual-space argument in `exists_row_combination`), and
 the coefficients of that combination are the logarithms of the unit change.
 
-**What is and is not new here.** The counting half ("there are `n − rank` groups") is standard
-and has been set up in Lean before (Bobbin et al. 2025, as far as their abstract and text show;
-not re-checked line by line). What this file adds is the half that says something about
-functions: unit-independence implies dependence on the groups alone. Two web searches found no
-earlier proof of that half in Lean. That is weak evidence of novelty, not a claim of it; Botta
-et al. (2023) discuss the theorem in a dependently typed setting and should be read before
-anyone writes "first".
+**What is and is not new here.** A literature search (2026-11-13, summarized in
+`docs/CONTRIBUTIONS.md`) reports that Bobbin et al. (Lean 4, 2025) *define* the count
+`n − rank` and the kernel but prove no statement about functions, and that Botta & Jansson
+(Idris/Agda) state the theorem as a type, argue the textbook form is not constructive, and
+prove the converse direction (functions built from Pi groups are covariant). The search found
+no machine-checked proof of the direction proved here, "unit-independent ⟹ function of the
+groups". Its confidence was moderate: it read the Lean code of Bobbin et al. through their
+paper, not the repository, and could not cover every proof-assistant library. So: probably a
+first formal proof of a known theorem, not established as one. Note that
+`buckingham_pi_factorization` uses classical choice, consistent with Botta & Jansson's remark.
 
 **Limits.** Positive quantities only (Limits §7: "is this length positive?" is unit-independent
 and is not a function of zero groups). The groups must span (Limits §6: leave out the ratio of
@@ -223,39 +228,158 @@ another are not covered. Solutions must be positive.
 
 ---
 
-## 6. What a per-model certificate now contains
+## 6. Rational right-hand sides
 
-`lean/NondimVerify/Certified/Desr/<Model>.lean` (desr's answer) and
-`Certified/Own/<Model>.lean` (this package's answer) have the same shape:
+Holling type II predation `a N P / (1 + a h N)` and Michaelis–Menten kinetics are quotients, not
+polynomials. `Rational.lean` repeats the theory for systems whose right-hand sides are **sums of
+quotients of polynomials** (`RatSystem`).
+
+**Symmetry** (`RatSystem.IsSymmetry`, decidable). In every quotient of equation `i`, each
+numerator term and each denominator term have weights that differ by the weight of `dx_i/dt`.
+In particular the numerator and the denominator are each homogeneous: `1 + a h N` forces
+`a h N` to be dimensionless.
+
+**Statements.** `rhs_scale`, `map_solution`, `solution_iff`, `param_const`, `nondimensionalize`,
+`reduction`, `reduction_of_parameters` and `hasDerivAt_newVariable` hold word for word as in
+§1, §2 and §5.
+
+**Proof idea.** Only `rhs_scale` is new: numerator and denominator each pick up a power of the
+scale factors, and the quotient picks up the ratio (`Frac.eval_scale`). No hypothesis that
+denominators are nonzero is needed, because Lean's `x / 0 = 0` makes both sides zero.
+Everything after `rhs_scale` uses the system only through that identity.
+
+**How a certificate avoids dividing.** Each quotient `N/D` is reduced by two identities without
+division, `D = m · D'(invariants)` and `(factor) · N = T · m · N'(invariants)` with `m` a
+monomial of `D`, and `frac_reduce` combines them. The equation is the sum of its quotients.
+
+**Limits.** Where a denominator vanishes the statements are true and say nothing (Limits §14).
+For rational models Lean certifies the reduced equation in sum-of-quotients form; that this
+equals the form the tool printed is checked by SymPy, not by Lean. The proofs after `rhs_scale`
+are repeated, not shared with the polynomial case (a refactoring debt, D36).
+
+---
+
+## 7. Constraints and unit links
+
+A reduction may only use scalings that respect what the model says about units. Two forms:
+
+* **A unit link**: "`N` is measured like `S`". Formally, the ratio `S/N` must be unchanged by
+  every scaling. In a certificate: `links_respected : A * Links = 0` (by `pi_group_invariant`
+  each linked ratio is then invariant).
+* **A polynomial relation** such as a conservation law `S + I + R − N = 0`.
+  `IsHomogeneous A p` (decidable) says all its terms have the same weight, and
+  `IsHomogeneous.poly_scale_eq_zero_iff` says the rescaled point satisfies the relation exactly
+  when the original one does.
+
+The two are the same condition: a relation is homogeneous exactly when all ratios of its terms
+are invariant. The ODEbase importer uses that to turn conservation laws into links.
+
+**Why it matters.** `N` does not occur in the SIR differential equations, so "scale `S, I, R`
+but not `N`" is a symmetry of the equations. It sends a state with `S + I + R = N` to one
+without. Dropping the link is how a *spurious* nondimensionalization arises (Tanburn et al.
+2025). `NondimVerifyTest/Identifiability.lean` has this as a worked example.
+
+**Not done.** Tanburn et al.'s general theorem that dimensionally consistent changes of
+variables preserve the dimension of the maximal scaling symmetry is not formalized.
+
+---
+
+## 8. What scalings say about identifiability
+
+**Statement** (`IsSymmetry.not_identifiable`). Suppose a scaling is a symmetry, does not rescale
+time, and leaves every measured output unchanged (`OutputInvariant`, decidable). If it acts on
+variable `i`, then every solution with `x_i ≠ 0` has a twin: another solution with the same
+outputs at all times, a different value of `x_i`, and the same signs. Hence `i` is not
+identifiable from those outputs (`not_identifiable'`, with `Identifiable` defined as "equal
+data at all times implies equal `x_i`").
+
+**Proof idea.** Apply the scaling with factor 2 on one row. §1 gives a solution, the time factor
+is 1 so the output curve is literally the same function of time, and `2^k ≠ 1` moves `x_i`.
+
+**This is a one-way test, and the limits are proved, not just stated.**
+
+* Limits §11: for `dx/dt = a − b` observed through `x`, *no* scaling symmetry that fixes time
+  and the output moves `a`, yet `a` is not identifiable. A method that looks only at scalings
+  reports nothing there. This is the point Villaverde & Massonis (2021) made against reading
+  the scaling test of Castro & de Boer (2020) as a complete one.
+* Limits §12: the hypothesis "time is not rescaled" cannot be dropped. For `dx/dt = k` observed
+  through `x`, changing the time unit is a symmetry that leaves the value of `x` alone, and `k`
+  *is* identifiable.
+
+**Limits.** `Identifiable` is global and exact (all solutions, all times); the usual structural
+notion is generic. Only polynomial systems (`LaurentSystem`) have this theorem so far.
+
+---
+
+## 9. Goal queries and the minimal parameter count
+
+A request such as "remove at least `k` parameters, keep these, and let `R₀` appear" gets an
+answer with a proof either way.
+
+| Answer | Lean | Certificate supplied by the solver |
+|---|---|---|
+| possible: these parameters can be scaled to 1 | `exists_normalizing_scaling` | left inverse `G`, factor `d` |
+| the requested group is dimensionless | `A *ᵥ g = 0` | none (`decide`) |
+| impossible: too many parameters asked for | `not_normalizable_of_rank_lt` | the rank of the candidate columns |
+| impossible: the group has units | `monomial_not_invariant` | the scaling that moves it |
+| impossible: the groups are dependent | `W *ᵥ c = 0`, `c ≠ 0` | the relation `c` |
+
+**The count.** `not_normalizable_of_rank_lt`: if the parameter columns of the scaling matrix
+have rank `ρ`, no `ρ + 1` distinct parameters can all be scaled to 1 for every positive choice
+of values. Each certificate proves this for its model (`cannot_remove_more`) next to a
+reduction that removes exactly `ρ`. So `p − ρ` is the smallest number of parameters any
+nondimensionalization by scaling can leave.
+
+**Limits.** "For every positive choice of values" is essential (Limits §13). Requests that are
+not algebraic ("make ε small", "bring variables near 1") are outside this; so are requests
+rejected before any linear algebra (a group that is not a monomial), which get no Lean
+statement.
+
+---
+
+## 10. What a per-model certificate contains
+
+`lean/NondimVerify/Certified/` has one file per model and source: `Desr/` (desr's answer),
+`Own/` (this package's), `ODEbase/` (ten published models). All have the same shape.
 
 | Theorem | Says | Proved by |
 |---|---|---|
 | `eq_<state>` | the data is the equation you wrote | `simp`, `ring` |
 | `symmetry` | the tool's scalings are symmetries | `decide`, read off the data |
 | `unimodular`, `invariant`, `auxiliaries_free`, `auxiliaries_are_parameters` | the hypotheses of §5a | `decide` |
-| `reduced_identity_<state>` | the identity of §5b | `simp`, `field_simp`, `ring` |
+| `reduced_identity_<state>` | the identity of §5b | `simp`, `field_simp`, `ring` (rational: `frac_reduce`) |
 | `reduction_correct` | **along every positive solution, the tool's new variables satisfy the tool's reduced equations in the tool's new time** | §5b |
 | `cross_section` | the solution rescales to one with all auxiliary monomials equal to 1 | §5a |
 | `invariants_complete` | everything unit-independent is a function of the tool's invariants | §4 |
 | `kills_K`, `rank_K`, `rank_A` | no scaling was missed | `decide`, `eval_rank` |
+| `links_respected` (if the model has unit links) | the scalings respect them | §7 |
+| `cannot_remove_more` | the minimal parameter count | §9 |
+| `not_identifiable_<parameter>` (if the model has outputs) | the outputs cannot determine it | §8 |
+| `goal<k>_possible` / `goal<k>_impossible` (own solver, if goals are listed) | the answer to each request | §9 |
 
 Every general theorem and a sample of certificate theorems are checked with `#print axioms`:
 they rest on Lean's three standard axioms (`propext`, `Classical.choice`, `Quot.sound`) and on
 nothing else (`test_key_theorems_do_not_depend_on_sorry`).
 
-## 7. What is still not proved
+## 11. What is still not proved
 
 1. **"No scaling was missed" still uses an exponent matrix printed by Python.** `symmetry` is
    read off the Lean data, but `kills_K`/`rank_K` refer to a literal `Kmat`. A test re-derives
    it independently; Lean does not yet derive it from `sys`.
-2. **Models with unit links** (SIR with `N`, Michaelis–Menten with `s₀`) are not expressed in
-   the general form. They keep their first-release certificates.
-3. **Rational right-hand sides** are outside `LaurentSystem`.
-4. **The converse of §1** (solution-preserving scalings are symmetries of the terms).
-5. **Solutions on an interval.** `IsSolution` asks for a derivative at every real time, which
+2. **For rational models, "the reduced equation equals the one the tool printed"** is checked by
+   SymPy. Lean certifies the sum-of-quotients form.
+3. **Unit links are not passed to desr.** Models with links are certified for this package's
+   solver only.
+4. **The identifiability theorem is one-way** (by nature, §8) and exists for polynomial systems
+   only; the notion used is global, not generic.
+5. **The converse of §1** (solution-preserving scalings are symmetries of the terms).
+6. **Solutions on an interval.** `IsSolution` asks for a derivative at every real time, which
    excludes solutions that blow up in finite time.
-6. Whether the equations typed in are the intended model. No proof can settle that.
+7. **Tanburn et al.'s change-of-variables theorem** and anything about non-scaling symmetries.
+8. Whether the equations typed in are the intended model. No proof can settle that.
 
 Sources: Hubert & Labahn 2013 [HL13] for the algorithm and the moving-frame view behind §5;
-Tanburn et al. 2025 [T25] for the form desr returns; Bobbin et al. 2025 [B25] and Botta et al.
-2023 [BJ23] for earlier formal work on dimensions. Full references in `docs/DECISIONS.md`.
+Tanburn et al. 2025 [T25] for the form desr returns and for spurious reductions (§7); Castro &
+de Boer 2020 [CdB20] and Villaverde & Massonis 2021 [VM21] for §8; Bobbin et al. 2025 [B25] and
+Botta & Jansson [BJ23] for earlier formal work on dimensions. Full references in
+`docs/DECISIONS.md`.

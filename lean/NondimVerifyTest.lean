@@ -7,4 +7,6 @@ import NondimVerifyTest.System
 import NondimVerifyTest.Criterion
 import NondimVerifyTest.BuckinghamPi
 import NondimVerifyTest.Reduction
+import NondimVerifyTest.Identifiability
+import NondimVerifyTest.Rational
 import NondimVerifyTest.Limits

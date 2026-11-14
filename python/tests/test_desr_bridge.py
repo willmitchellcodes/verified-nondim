@@ -30,7 +30,8 @@ from nondim.hlform import NotSupported, from_nondim  # noqa: E402
 from nondim.model import Model  # noqa: E402
 from nondim.scaling import analyze, nondimensionalize  # noqa: E402
 
-SUPPORTED = ["logistic", "sir_noN", "lotka_volterra", "michaelis_menten", "spurious_original", "spurious_substituted"]
+SUPPORTED = ["logistic", "sir_noN", "lotka_volterra", "michaelis_menten", "rosenzweig_macarthur",
+             "spurious_original", "spurious_substituted"]
 
 
 def test_desr_is_available_and_reports_a_version():
@@ -146,7 +147,7 @@ def test_a_missed_symmetry_would_be_detected():
 
 @pytest.mark.parametrize("key, reason", [
     ("sir", "unit links"), ("michaelis_menten_ic", "unit links"), ("spurious_fixed", "unit links"),
-    ("rosenzweig_macarthur", "polynomial"), ("sir_reported", "do not appear"),
+    ("sir_reported", "do not appear"),
 ])
 def test_unsupported_models_are_refused_with_a_reason(key, reason):
     with pytest.raises(NotSupported, match=reason):

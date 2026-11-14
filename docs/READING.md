@@ -100,3 +100,20 @@ Methods to add to the list above: **decidable propositions** (`decide +kernel` p
 `sys.IsSymmetry A tau` by evaluation), **certificates for linear algebra** (a left inverse or a
 kernel vector instead of a rank), and **property-based testing** (random models as a second
 opinion on a design; it changed this one, see `docs/DESR.md`).
+
+## For identifiability, real models, and where this could go
+
+1. **Castro & de Boer (2020)**, "Testing structural identifiability by a simple scaling method",
+   *PLOS Computational Biology*, and the reply by **Villaverde & Massonis (2021)**, "…relying on
+   scaling symmetries can be misleading". Read them as a pair: the first is the method behind
+   `IsSymmetry.not_identifiable`, the second is why the theorem is stated one way only
+   (`NondimVerifyTest/Limits.lean` §11 is a small version of their objection).
+2. **Lüders, Sturm, Radulescu (2022)**, "ODEbase", *Bioinformatics Advances*. What the pilot in
+   `docs/ODEBASE.md` runs on, and how the models were prepared.
+3. **Tanburn et al. (2025)**, the sections on dimensional consistency and "spurious"
+   nondimensionalizations. `docs/THEORY.md` §7 formalizes the mechanism on SIR; their general
+   theorem about changes of variables is the next thing to formalize.
+4. **Hawi & Wechselberger (2026)**, arXiv:2611.04127: exact minimal parameter counts and the
+   choice of scales for reaction networks. Compare with `cannot_remove_more`.
+5. **StructuralIdentifiability.jl** (documentation at docs.sciml.ai): the complete, uncertified
+   tool a one-way scaling test should be checked against.
