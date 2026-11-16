@@ -1,4 +1,6 @@
 import NondimVerify.Reduction
+import NondimVerify.Criterion
+import NondimVerify.Identifiability
 import NondimVerify.Theory
 
 /-!
@@ -27,6 +29,7 @@ Parameters: 2 -> 1
 set_option linter.unusedVariables false
 set_option linter.unusedTactic false
 set_option linter.unreachableTactic false
+set_option linter.unusedSimpArgs false
 
 namespace NondimVerify.Certified.Desr.SpuriousOriginal
 
@@ -227,5 +230,32 @@ theorem rank_K : Kmat.rank = 3 := by unfold Kmat; eval_rank
 
 /-- 1 independent scalings out of 4 - 3 = 1 possible: none is missing. -/
 theorem rank_A : Afull.rank = 1 := by unfold Afull; eval_rank
+
+/-! ## The smallest possible number of parameters
+
+The scalings act on the 2 parameters with rank 1. So 1 parameters can be scaled to 1
+(the reduction above does it) and no 2 can: at least 1 parameter(s) remain,
+whatever nondimensionalization by scaling is chosen.
+-/
+
+/-- Positions of the parameters: a, b. -/
+def P : Fin 2 → Fin 3 := ![0, 1]
+
+/-- The parameter columns of `A`. -/
+def ParamCols : Matrix (Fin 1) (Fin 2) ℚ :=
+  !![-1, -1]
+
+theorem paramCols_eq : (A.submatrix id P).map (Int.castRingHom ℚ) = ParamCols := by
+  decide +kernel
+
+theorem rank_paramCols : ParamCols.rank = 1 := by unfold ParamCols; eval_rank
+
+/-- **No 2 distinct parameters can all be scaled to 1** (for every positive choice of
+their values). Together with the reduction above this fixes the minimal parameter count. -/
+theorem cannot_remove_more (S : Fin 2 → Fin 2) (hS : Function.Injective S) :
+    ¬ ∀ c : Fin 3 → ℝ, (∀ i, 0 < c i) →
+        ∃ lam : Fin 1 → ℝ, (∀ j, 0 < lam j) ∧ ∀ i, scale A lam c (P (S i)) = 1 :=
+  not_normalizable_of_rank_lt A P S (Function.Injective.comp (by decide) hS)
+    (by rw [paramCols_eq, rank_paramCols]; omega)
 
 end NondimVerify.Certified.Desr.SpuriousOriginal

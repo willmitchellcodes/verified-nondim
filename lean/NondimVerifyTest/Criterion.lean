@@ -1,4 +1,5 @@
 import NondimVerify.Criterion
+import NondimVerify.Certified
 
 /-! # Unit tests: the constraint criterion as an equivalence -/
 
@@ -92,5 +93,48 @@ example (A : Matrix (Fin 2) (Fin 5) ℤ) (S : Fin 2 → Fin 5) (hS : Function.In
         ∃ lam : Fin 2 → ℝ, (∀ j, 0 < lam j) ∧ ∀ i, scale A lam c (S i) = 1) ↔
       ((A.submatrix id S).map (Int.castRingHom ℚ)).rank = 2 :=
   normalizable_iff_rank A S hS
+
+/-! ## Goal queries: the two extra answers, and the count -/
+
+-- `a b` has units under the first scaling (weight 1), so it cannot be a dimensionless group:
+-- some change of units changes its value at every positive point.
+example : ∃ lam : Fin 2 → ℝ, (∀ j, 0 < lam j) ∧
+    ∀ x : Fin 3 → ℝ, (∀ i, 0 < x i) → monomial (scale A lam x) ![1, 1, 0] ≠ monomial x ![1, 1, 0] :=
+  monomial_not_invariant A ![1, 1, 0] 0 (by decide +kernel)
+
+-- `a b / c` is dimensionless: every scaling leaves it alone (so the theorem above cannot apply).
+example : A *ᵥ ![1, 1, -1] = 0 := by decide +kernel
+
+-- Selecting columns never raises the rank.
+example (B : Matrix (Fin 2) (Fin 5) ℚ) (S : Fin 3 → Fin 5) : (B.submatrix id S).rank ≤ B.rank :=
+  rank_submatrix_columns_le B S
+
+/-- The parameter columns of `A` as a rational matrix, for the rank. -/
+def Aq : Matrix (Fin 2) (Fin 3) ℚ := !![1, 0, 1; 0, 1, 1]
+theorem Aq_eq : (A.submatrix id id).map (Int.castRingHom ℚ) = Aq := by decide +kernel
+theorem rank_Aq : Aq.rank = 2 := by unfold Aq; eval_rank
+
+-- With rank 2, no three distinct parameters can all be normalized: the minimal count is 3 − 2 = 1.
+example (S : Fin 3 → Fin 3) (hS : Function.Injective S) :
+    ¬ ∀ c : Fin 3 → ℝ, (∀ i, 0 < c i) →
+        ∃ lam : Fin 2 → ℝ, (∀ j, 0 < lam j) ∧ ∀ i, scale A lam c (id (S i)) = 1 :=
+  not_normalizable_of_rank_lt A id S (Function.injective_id.comp hS)
+    (by rw [Aq_eq, rank_Aq]; omega)
+
+-- The same statements, generated for SIR: three parameters, rank two, so R0 must remain.
+section Generated
+open NondimVerify.Certified
+
+example : Own.SIR.ParamCols.rank = 2 := Own.SIR.rank_paramCols
+
+example (S : Fin 3 → Fin 3) (hS : Function.Injective S) :
+    ¬ ∀ c : Fin 6 → ℝ, (∀ i, 0 < c i) →
+        ∃ lam : Fin 2 → ℝ, (∀ j, 0 < lam j) ∧ ∀ i, scale Own.SIR.A lam c (Own.SIR.P (S i)) = 1 :=
+  Own.SIR.cannot_remove_more S hS
+
+-- "keep γ and N, remove two" is impossible; "have R0 = βN/γ" is possible and R0 is dimensionless
+example : Own.SIR.A *ᵥ ![0, 0, 0, 1, -1, 1] = 0 := Own.SIR.goal4_R0_dimensionless
+
+end Generated
 
 end NondimVerifyTest.Criterion

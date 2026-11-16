@@ -59,7 +59,9 @@ CATALOG = {
     "spurious_fixed": dict(normalize=None, certify=True, constraints=[dict(eliminate_at_least=2)]),
 }
 
-# Models exported in the general form (polynomial right-hand sides, no unit links).
+# Models exported in the general form (right-hand sides that are polynomials or quotients of
+# polynomials; unit links allowed).
 # "Own" certificates come from this package's solver; "Desr" ones from desr, when it is installed.
-GENERAL = ["logistic", "sir_noN", "sir_reported", "lotka_volterra", "michaelis_menten",
-           "spurious_original", "spurious_substituted"]
+GENERAL = ["logistic", "sir", "sir_noN", "sir_reported", "lotka_volterra", "michaelis_menten",
+           "michaelis_menten_ic", "rosenzweig_macarthur", "spurious_original", "spurious_substituted",
+           "spurious_fixed"]

@@ -9,6 +9,7 @@
     experiment                   the SIR data-fitting experiment (Framing 3)
     desr <model>                 run desr on a model and cross-check it against this package
     compare                      desr vs. this package on every model -> reports/desr_comparison.md
+    audit [--fetch] [--certify N]  scaling symmetries of ODEbase's published models -> reports/odebase_pilot.md
     init-lean DIR                create the Lean 4 project that checks the certificates
     certify [models...]          write Lean certificates (matrix-level and general form)
     all                          reports + certificates + experiment
@@ -129,6 +130,14 @@ def _camel(name: str) -> str:
     return "".join(p[:1].upper() + p[1:] for p in name.split("_"))
 
 
+def own_reduction(key: str):
+    """This package's reduction of a built-in model, in the solver-independent form.
+    Uses the catalog's choice of parameters to normalize (e.g. gamma and N for SIR, so that
+    the surviving parameter is R0)."""
+    from .hlform import from_nondim
+    return from_nondim(nondimensionalize(models.ALL[key](), normalize=CATALOG[key].get("normalize")))
+
+
 def certify_general(lean_dir: Path | None = None, quiet=False, use_desr: bool | None = None) -> dict:
     """Write general-form certificates into `lean_dir/Certified/{Own,Desr}/`.
 
@@ -142,19 +151,21 @@ def certify_general(lean_dir: Path | None = None, quiet=False, use_desr: bool | 
     lean_dir = Path(lean_dir) if lean_dir is not None else default_lean_dir() / "NondimVerify"
     use_desr = desr_available() if use_desr is None else use_desr
     done = {"Own": [], "Desr": [], "skipped": {}}
-    sources = [("Own", lambda m: from_nondim(nondimensionalize(m)))]
+    sources = [("Own", None)]
     if use_desr:
         sources.append(("Desr", from_desr))
     for key in GENERAL:
         model = models.ALL[key]()
         for src, make in sources:
             try:
-                red = make(model)
+                red = make(model) if make else own_reduction(key)
             except NotSupported as e:
                 done["skipped"][(src, key)] = str(e)
                 continue
             name = _camel(model.name)
-            path = lean_export2.write_certificate(red, lean_dir / "Certified" / src / f"{name}.lean", f"{src}.{name}")
+            goals = CATALOG[key].get("constraints") if src == "Own" else None
+            path = lean_export2.write_certificate(red, lean_dir / "Certified" / src / f"{name}.lean",
+                                                  f"{src}.{name}", goals)
             done[src].append(name)
             if not quiet:
                 print(f"  wrote {path.relative_to(lean_dir.parent)}")
@@ -203,6 +214,41 @@ def comparison_table() -> str:
             L.append(f"| {key} | {r['parameters']} | {r['ours_scalings']} / {r['desr_scalings']} | "
                      f"{r['ours_after']} / {r['desr_after']} | {'yes' if r['same_scalings'] else '**NO**'} | `{inv}` | |")
     return "\n".join(L)
+
+
+def default_odebase_dir() -> Path:
+    return Path.home() / ".cache" / "verified-nondim" / "OscarODEbase" / "src" / "odes"
+
+
+def cmd_audit(a):
+    """Pilot audit of ODEbase's polynomial models (see docs/ODEBASE.md)."""
+    import subprocess
+
+    from . import odebase
+    from .desr_bridge import desr_available
+
+    data = Path(a.data) if a.data else default_odebase_dir()
+    if not data.exists():
+        if not a.fetch:
+            raise SystemExit(f"model files not found in {data}.\nRun `nondim audit --fetch` to download them "
+                             f"(git clone {odebase.REPO}), or pass --data DIR.")
+        target = data.parent.parent
+        target.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "clone", "--depth", "1", odebase.REPO, str(target)], check=True)
+    rows, skipped = odebase.audit(data, limit=a.limit, with_desr=desr_available() and not a.no_desr,
+                                  progress=(lambda name, dt: print(f"  {name} {dt:.1f}s")) if a.verbose else None)
+    out = _reports_dir(a)
+    out.mkdir(parents=True, exist_ok=True)
+    text = odebase.report(rows, skipped)
+    (out / "odebase_pilot.md").write_text(text)
+    print(text.split("## Per model")[0])
+    if a.certify:
+        ids = odebase.certifiable(rows, a.certify)
+        lib = _lib_dir(a)
+        for path in odebase.write_certificates(data, ids, lib):
+            print(f"  wrote {path.relative_to(lib.parent)}")
+        certify_general(lib, quiet=True)  # refresh the index of certificates
+    print(f"report: {out / 'odebase_pilot.md'}")
 
 
 def cmd_compare(a):
@@ -278,6 +324,10 @@ def main(argv=None):
     s.add_argument("--out", help="folder for the report (default: ./reports)"); s.set_defaults(f=cmd_experiment)
     s = sub.add_parser("desr"); s.add_argument("model"); s.set_defaults(f=cmd_desr)
     s = sub.add_parser("compare"); s.add_argument("--out"); s.set_defaults(f=cmd_compare)
+    s = sub.add_parser("audit"); s.add_argument("--data"); s.add_argument("--out"); s.add_argument("--lean")
+    s.add_argument("--fetch", action="store_true"); s.add_argument("--limit", type=int)
+    s.add_argument("--certify", type=int, default=0); s.add_argument("--no-desr", action="store_true")
+    s.add_argument("--verbose", action="store_true"); s.set_defaults(f=cmd_audit)
     s = sub.add_parser("init-lean"); s.add_argument("dir"); s.add_argument("--force", action="store_true")
     s.set_defaults(f=cmd_init_lean)
     s = sub.add_parser("certify"); s.add_argument("models", nargs="*")

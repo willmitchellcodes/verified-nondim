@@ -15,15 +15,23 @@ import sympy as sp
 from conftest import LEAN
 from lean_reader import matrices
 from nondim import lean_export2, models
-from nondim.catalog import GENERAL
-from nondim.cli import _camel, certify_general
+from nondim.catalog import CATALOG, GENERAL
+from nondim.cli import _camel, certify_general, own_reduction
 from nondim.hlform import HLReduction, NotSupported, from_nondim, left_inverse_certificate, system_terms
 from nondim.model import Model
 from nondim.scaling import all_nondimensionalizations, analyze, nondimensionalize
 
 
 def own(key) -> HLReduction:
-    return from_nondim(nondimensionalize(models.ALL[key]()))
+    """This package's reduction with the catalog's choice of normalized parameters."""
+    return own_reduction(key)
+
+
+def own_text(key, module="Own.X") -> str:
+    return lean_export2.certificate(own(key), module, CATALOG[key].get("constraints"))
+
+
+POLYNOMIAL = [k for k in GENERAL if k != "rosenzweig_macarthur"]
 
 
 # ----------------------------------------------------------------- terms: the model as data
@@ -39,7 +47,7 @@ def test_terms_of_sir_are_the_textbook_monomials():
     assert c == -1 and e[S] == e[I] == e[beta] == 1 and e[gamma] == 0
 
 
-@pytest.mark.parametrize("key", GENERAL)
+@pytest.mark.parametrize("key", POLYNOMIAL)
 def test_terms_rebuild_the_equations_exactly(key):
     red = own(key)
     for v, terms in zip(red.variables, red.terms()):
@@ -220,8 +228,8 @@ def test_certificate_refuses_to_print_a_corrupted_reduction():
 
 def _model(name):
     return {
-        "unit_links": lambda: models.ALL["sir"](),
-        "rational": lambda: models.ALL["rosenzweig_macarthur"](),
+        "not_rational": lambda: Model.from_strings("Exp", {"x": "a*exp(-x) - b*x"}, "a b"),
+        "root": lambda: Model.from_strings("Root", {"x": "a*sqrt(x) - b*x"}, "a b"),
         "time_dependent": lambda: Model.from_strings("TimeDep", {"x": "a*x*t"}, "a"),
         "no_scaling": lambda: Model.from_strings("NoScaling", {"x": "1 - x"}, ""),
         "no_parameters": lambda: Model.from_strings("NoParams", {"x": "-x"}, ""),
@@ -230,12 +238,15 @@ def _model(name):
 
 
 @pytest.mark.parametrize("name, reason", [
-    ("unit_links", "unit links"), ("rational", "polynomial"), ("time_dependent", "autonomous"),
+    ("not_rational", "not a power of a model variable"), ("root", "fractional"),
+    ("time_dependent", "autonomous"),
     ("no_scaling", "no scaling symmetry"), ("no_parameters", "does not use every scaling"),
     ("needs_roots", "fractional powers"),
 ])
 def test_out_of_scope_models_raise_not_supported_with_the_reason(name, reason):
-    with pytest.raises(NotSupported, match=reason):
+    from nondim.model import OutOfScopeError
+    # the solver itself (OutOfScopeError) or the general form (NotSupported) refuses, with a reason
+    with pytest.raises((NotSupported, OutOfScopeError), match=reason):
         from_nondim(nondimensionalize(_model(name)))
 
 
@@ -281,7 +292,7 @@ def test_matrices_in_the_lean_text_satisfy_the_relations(key):
 TERM = re.compile(r"⟨\(?(-?\d+)(?: / (\d+))?\)?, !\[([-\d, ]+)\]⟩")
 
 
-@pytest.mark.parametrize("key", GENERAL)
+@pytest.mark.parametrize("key", POLYNOMIAL)
 def test_symmetry_can_be_rechecked_from_the_lean_text(key):
     """Parse `sys`, `A`, `tau` back out of the Lean file and redo Lean's symmetry check by hand."""
     red = own(key)
@@ -309,7 +320,7 @@ def test_own_certificates_on_disk_are_up_to_date(key):
     red = own(key)
     name = _camel(red.model.name)
     on_disk = (LEAN / "NondimVerify" / "Certified" / "Own" / f"{name}.lean").read_text()
-    assert on_disk == lean_export2.certificate(red, f"Own.{name}")
+    assert on_disk == own_text(key, f"Own.{name}")
 
 
 def test_certify_general_writes_files_and_an_index(tmp_path):
@@ -323,8 +334,8 @@ def test_certify_general_writes_files_and_an_index(tmp_path):
 
 def test_the_library_index_imports_the_general_theory():
     top = (LEAN / "NondimVerify.lean").read_text()
-    for mod in ["System", "Criterion", "BuckinghamPi", "Reduction", "Certified"]:
+    for mod in ["System", "Criterion", "BuckinghamPi", "Reduction", "Rational", "Identifiability", "Certified"]:
         assert f"import NondimVerify.{mod}" in top
     tests = (LEAN / "NondimVerifyTest.lean").read_text()
-    for mod in ["System", "Criterion", "BuckinghamPi", "Reduction", "Limits"]:
+    for mod in ["System", "Criterion", "BuckinghamPi", "Reduction", "Rational", "Identifiability", "Limits"]:
         assert f"import NondimVerifyTest.{mod}" in tests

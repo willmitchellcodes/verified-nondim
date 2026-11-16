@@ -9,7 +9,7 @@ import re
 
 import sympy as sp
 
-DEF = re.compile(r"def (\w+) : Matrix \(Fin (\d+)\) \(Fin (\d+)\) ℤ :=\s*!!\[(.*?)\]", re.S)
+DEF = re.compile(r"def (\w+) : Matrix \(Fin (\d+)\) \(Fin (\d+)\) [ℤℚ] :=\s*!!\[(.*?)\]", re.S)
 THEOREM = re.compile(r"theorem (\w+)(.*?) := by", re.S)
 
 

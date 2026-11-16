@@ -75,11 +75,12 @@ print(analyze_identifiability(observed).summary())
 ## Let Lean check it
 
 ```bash
-nondim init-lean proofs        # a Lean 4 + Mathlib project with the certificates
+nondim init-lean proofs
 cd proofs && lake exe cache get && lake build
 ```
 
-Every claim above becomes a theorem that Lean re-proves. From the SIR certificate:
+`init-lean` creates a Lean 4 + Mathlib project that holds the certificates. Every claim above
+becomes a theorem that Lean re-proves. From the SIR certificate:
 
 ```lean
 theorem symmetries : Amat * Kmat = 0 := by decide +kernel
@@ -94,7 +95,8 @@ The Python code is never trusted: if it were wrong, the Lean build would fail.
 [desr](https://github.com/ofloveandhate/desr) is the reference tool for this algorithm.
 `nondim desr lotka_volterra` runs it, compares it with the solver above, and `nondim certify`
 turns its answer into Lean theorems: its scalings are symmetries, and along every positive
-solution its new variables satisfy its reduced equations.
+solution its new variables satisfy its reduced equations. `nondim audit --fetch` runs the
+solver over 190 published BioModels systems ([what it found](https://github.com/willmitchellcodes/verified-nondim/blob/main/docs/ODEBASE.md)).
 
 ## More
 

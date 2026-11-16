@@ -1,5 +1,9 @@
 # Guide: how verified-nondim is put together
 
+> **In one line.** How the tool is put together: what each command does, what Lean checks, where every file lives.
+>
+> **Start with:** `nondim tour`, then the examples in this file.
+
 **The question.** Can a computer nondimensionalize an ODE model *and* hand back machine-checked
 guarantees: the new variables are unitless, no solutions are lost, no further parameter could
 have been removed, and a requested constraint is either met or provably impossible?
@@ -16,10 +20,13 @@ dI/dt =  β S I - γ I    ──────────────────
 
 From a clone of the repository:
 
+`./setup.sh` is run once: it creates the Python environment, installs Lean and Mathlib and runs
+every test. `nondim tour` is a two-minute guided walk through the example above.
+
 ```bash
-./setup.sh                      # once: Python env, Lean + Mathlib, runs every test
+./setup.sh
 source .venv/bin/activate
-nondim tour                     # 2-minute guided walk through the example above
+nondim tour
 ```
 
 Then read, in this order: `docs/BACKGROUND.md` (the math by hand) → `examples/` (five short
@@ -56,8 +63,8 @@ and the inputs you typed.
 The first pipeline certifies matrix facts about each model. The second proves the theory once
 (`docs/THEORY.md`) and lets a certificate say something stronger: *along every positive
 solution, the tool's new variables satisfy the tool's reduced equations*. It also accepts
-desr's answers, not only ours (`docs/DESR.md`). Models with unit links or rational right-hand
-sides are covered by the first pipeline only.
+desr's answers, not only ours (`docs/DESR.md`). Every built-in model is now covered by the
+second pipeline, including SIR with `N` (unit links) and Rosenzweig–MacArthur (rational).
 
 ## The three framings
 
@@ -82,8 +89,37 @@ Run with the virtual environment active (`python -m nondim …` works too).
 | `nondim experiment` | SIR data-fitting experiment → `reports/identifiability_sir.md` |
 | `nondim desr <model>` | run desr on a model and cross-check it against this package (needs desr, see `docs/DESR.md`) |
 | `nondim compare` | desr vs. this package on every model → `reports/desr_comparison.md` |
+| `nondim audit --fetch` | scaling symmetries of published BioModels systems (ODEbase) → `reports/odebase_pilot.md`; see `docs/ODEBASE.md` |
 | `nondim certify` | regenerate the Lean certificates (both kinds; desr's when desr is installed) |
 | `nondim all` | everything: `reports/`, certificates, experiment |
+
+### Four commands and what they print
+
+Every block of this kind in the documentation is run by the test suite, and the lines shown
+must appear in the real output (`...` marks output left out). See `docs/README.md`.
+
+A request that can be met, one that cannot because there are too few scalings, and one that
+cannot because the requested group has units:
+
+```console
+$ nondim constrain sir -k 2 --keep beta
+SAT: normalize ['gamma', 'N'] (removes 2 >= 2).
+...
+$ nondim constrain sir -k 3
+UNSAT: only 2 independent scaling direction(s) act on ['beta', 'gamma', 'N'], so at most 2 of them can be removed (asked for 3).
+$ nondim constrain sir --want force=beta*N
+UNSAT: force = N*beta is not dimensionless: scaling #2 multiplies it by lambda^1.
+```
+
+What the data cannot separate when only reported cases `y = rho*I` are observed:
+
+```console
+$ nondim identify sir_reported
+  NOT identifiable (moved by a scaling): ['beta', 'rho']
+  not flagged by this test:              ['gamma']
+  (one-way test: 'not flagged' does not prove identifiable)
+```
+
 | `cd python && python -m pytest -q` | all Python + bridge tests (Lean tests run if Lean is installed) |
 | `cd lean && lake build` | Lean re-checks every certificate, proof and Lean unit test |
 
@@ -98,6 +134,22 @@ Run with the virtual environment active (`python -m nondim …` works too).
 | `cross_section` | the solution rescales to one in which the removed parameter groups equal 1 |
 | `invariants_complete` | Buckingham Pi: anything unit-independent is a function of the new variables |
 | `kills_K`, `rank_K`, `rank_A` | no scaling was missed |
+| `links_respected` | the scalings respect the model's unit links (for example `S` measured like `N`) |
+| `cannot_remove_more` | the smallest number of parameters any scaling reduction can leave |
+| `not_identifiable_<p>` | the measured outputs cannot determine `p` (models with outputs) |
+| `goal<k>_possible`, `goal<k>_impossible` | the answer to each request listed for the model in `nondim/catalog.py` |
+
+For SIR these are real lines of `lean/NondimVerify/Certified/Own/SIR.lean`:
+
+```lean
+theorem symmetry : sys.IsSymmetry A tau := by decide +kernel
+...
+theorem links_respected : A * Links = 0 := by decide +kernel
+...
+theorem goal4_R0_dimensionless : A *ᵥ ![0, 0, 0, 1, -1, 1] = 0 := by decide +kernel
+```
+
+New to the project? `examples/walkthrough.ipynb` goes through four course models step by step.
 
 ## What Lean checks for each model (`lean/NondimVerify/Cert/<Model>.lean`)
 
@@ -111,7 +163,7 @@ Run with the virtual environment active (`python -m nondim …` works too).
 | 6 | `Amat * Vmat = 0` | every new variable is dimensionless |
 | 7 | `Tmat.rank = n` | the change of variables is invertible |
 | 8 | `rhs_<state>` | chain rule: the reduced equations are the old ones, rescaled |
-| constraints | `constraintN_enough` / `_unsat`, `_want_invariant` / `_want_not_invariant`, `_regroup_*` | each verdict |
+| constraints | `constraint<k>_enough` / `constraint<k>_unsat`, `constraint<k>_want_invariant` / `_want_not_invariant`, `_regroup_*` | each verdict |
 
 Beyond the certificates: `Theory.lean` proves rank–nullity for scalings and maximality in
 general; `SIR.lean` proves that solutions and equilibria of SIR and its reduction correspond
@@ -138,14 +190,17 @@ to `python/nondim/models.py` and an entry to `python/nondim/catalog.py`.
 
 ```
 README.md  pyproject.toml  LICENSE  CHANGELOG.md  setup.sh
+AGENTS.md  briefing for AI coding agents and new contributors (CLAUDE.md imports it)
 assets/    logo.svg
-docs/      GUIDE.md  BACKGROUND.md  THEORY.md  DESR.md  DECISIONS.md  TESTING.md  READING.md  RELEASING.md
-examples/  01_quickstart  02_constraints  03_identifiability  04_your_own_model  05_certify_desr
-reports/   generated: SUMMARY.md, one report per model, identifiability_sir.md/.png, desr_comparison.md
+docs/      README.md (index, and how to read the examples)
+           GUIDE.md  BACKGROUND.md  THEORY.md  DESR.md  ODEBASE.md  CONTRIBUTIONS.md  DECISIONS.md  TESTING.md  READING.md  RELEASING.md
+examples/  01_quickstart  02_constraints  03_identifiability  04_your_own_model  05_certify_desr  walkthrough.ipynb
+reports/   generated: SUMMARY.md, one report per model, identifiability_sir.md/.png, desr_comparison.md, odebase_pilot.md
 python/    nondim/ (the package)   tests/ (pytest)
 lean/      NondimVerify/ (library)   NondimVerifyTest/ (Lean unit tests)
              Basic · Theory · SIR · Cert/            first release
-             System · Criterion · BuckinghamPi · Reduction · Certified/{Desr,Own}/   general theory
+             System · Criterion · BuckinghamPi · Reduction · Rational · Identifiability
+             Certified/{Desr,Own,ODEbase}/                                           general theory
 scripts/   publish_github.sh  publish_pypi.sh  set_repo_url.py
            workflows/  GitHub Actions templates: ci.yml, publish.yml, dependabot.yml
 ```
@@ -159,8 +214,9 @@ scripts/   publish_github.sh  publish_pypi.sh  set_repo_url.py
 * Only products, quotients and sums of powers. No `exp`, `log`, non-integer Hill exponents, °C.
 * Scalings are not all symmetries, so the identifiability test is one-way.
 * Proofs are about exact real numbers, not floating-point solvers.
-* The general theory covers autonomous polynomial systems, positive solutions, and reductions
-  in which each new state variable is one state times parameters (`docs/THEORY.md` §7).
+* The general theory covers autonomous systems whose right-hand sides are polynomials or
+  quotients of polynomials, positive solutions, and reductions in which each new state variable
+  is one state times parameters (`docs/THEORY.md` §11).
 
 ## Troubleshooting
 

@@ -149,4 +149,56 @@ theorem normalizable_iff_rank {n : ℕ} (A : Matrix (Fin r) (Fin n) ℤ) (S : Fi
       ((A.submatrix id S).map (Int.castRingHom ℚ)).rank = k := by
   rw [normalizable_iff A S hS, independent_iff_rank]
 
+/-! ## Two more answers a goal query can get -/
+
+/-- **A group with units cannot be a dimensionless parameter.** If some scaling gives the
+monomial with exponents `g` a nonzero weight, there is a change of units that changes its value
+at every positive point. -/
+theorem monomial_not_invariant {n : ℕ} (A : Matrix (Fin r) (Fin n) ℤ) (g : Fin n → ℤ) (j : Fin r)
+    (hg : (A *ᵥ g) j ≠ 0) :
+    ∃ lam : Fin r → ℝ, (∀ j', 0 < lam j') ∧
+      ∀ x : Fin n → ℝ, (∀ i, 0 < x i) → monomial (scale A lam x) g ≠ monomial x g := by
+  set lam : Fin r → ℝ := fun j' => if j' = j then 2 else 1 with hlam_def
+  have hlam_pos : ∀ j', 0 < lam j' := fun j' => by
+    simp only [hlam_def]; split_ifs <;> norm_num
+  refine ⟨lam, hlam_pos, fun x hx => ?_⟩
+  rw [monomial_scale_eq A lam (fun j' => (hlam_pos j').ne')]
+  have hprod : ∏ j', lam j' ^ (A *ᵥ g) j' = (2 : ℝ) ^ (A *ᵥ g) j := by
+    rw [Finset.prod_eq_single j]
+    · simp [hlam_def]
+    · intro b _ hb; simp [hlam_def, hb]
+    · intro hj; exact absurd (Finset.mem_univ j) hj
+  rw [hprod]
+  have hm : monomial x g ≠ 0 := (monomial_pos x hx g).ne'
+  have h2 : (2 : ℝ) ^ (A *ᵥ g) j ≠ 1 := fun h1 =>
+    hg ((zpow_eq_one_iff_right₀ (by norm_num : (0 : ℝ) ≤ 2) (by norm_num : (2 : ℝ) ≠ 1)).mp h1)
+  intro heq
+  exact h2 (mul_right_cancel₀ hm (heq.trans (one_mul _).symm))
+
+/-- Selecting columns cannot increase the rank. -/
+theorem rank_submatrix_columns_le {p : ℕ} (B : Matrix (Fin r) (Fin p) ℚ) (S : Fin k → Fin p) :
+    (B.submatrix id S).rank ≤ B.rank := by
+  have h : B.submatrix id S = B * (1 : Matrix (Fin p) (Fin p) ℚ).submatrix id S := by
+    ext i j
+    simp [Matrix.mul_apply, Matrix.one_apply]
+  rw [h]
+  exact Matrix.rank_mul_le_left _ _
+
+/-- **No more parameters can be removed than the rank allows.** Let `P` list the parameters that
+may be removed. If their columns of the scaling matrix have rank less than `k`, then no `k`
+distinct ones among them can all be scaled to 1 for every positive choice of values. -/
+theorem not_normalizable_of_rank_lt {n p : ℕ} (A : Matrix (Fin r) (Fin n) ℤ) (P : Fin p → Fin n)
+    (S : Fin k → Fin p) (hPS : Function.Injective (P ∘ S))
+    (hrank : ((A.submatrix id P).map (Int.castRingHom ℚ)).rank < k) :
+    ¬ ∀ c : Fin n → ℝ, (∀ i, 0 < c i) →
+        ∃ lam : Fin r → ℝ, (∀ j, 0 < lam j) ∧ ∀ i, scale A lam c (P (S i)) = 1 := by
+  intro hall
+  have hiff := (normalizable_iff_rank A (P ∘ S) hPS).mp hall
+  have h1 : (A.submatrix id (P ∘ S)).map (Int.castRingHom ℚ)
+      = ((A.submatrix id P).map (Int.castRingHom ℚ)).submatrix id S := by
+    ext i j; rfl
+  have h2 := rank_submatrix_columns_le ((A.submatrix id P).map (Int.castRingHom ℚ)) S
+  rw [h1] at hiff
+  omega
+
 end NondimVerify

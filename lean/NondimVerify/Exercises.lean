@@ -6,6 +6,12 @@ import NondimVerify.Theory
 Open this file in VS Code and replace each `sorry`. They complete the story told by
 `Theory.lean`, and working through them is a good way to understand *why* the method works.
 Check your work with `lake build NondimVerify.Exercises`.
+
+Since these were written, the library has gained its own proofs of the constraint criterion
+(Exercises 2 and 3): see `exists_normalizing_scaling` in `System.lean` and `normalizable_iff_rank`
+in `Criterion.lean`. They are stated with certificates and over ℚ rather than exactly as here,
+so the exercises are still worth doing; try them before reading those files. Exercise 1 (ranks
+over ℤ and ℚ agree) is still open in the library.
 -/
 
 namespace NondimVerify

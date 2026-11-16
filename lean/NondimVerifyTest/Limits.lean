@@ -1,5 +1,7 @@
 import NondimVerify.Reduction
 import NondimVerify.Criterion
+import NondimVerify.Identifiability
+import NondimVerify.Rational
 
 /-! # Where the theory stops: every hypothesis is needed
 
@@ -204,5 +206,85 @@ example (π : Fin 3 → ℝ) : reconstruct WdSkew π 3 = π 1 / π 0 ^ 3 := by
 example : reconstruct WdSkew ![2, 1, 1] 3 ≠ (![2, 1, 1] : Fin 3 → ℝ) 1 := by
   simp [reconstruct, monomial, WdSkew, Fin.prod_univ_succ]
   norm_num
+
+/-! ## 11. The identifiability test goes one way only
+
+`dx/dt = a - b`, measured `x`. Only the difference `a - b` matters, so `a` is not identifiable.
+But no scaling shows it: every scaling symmetry that fixes time and the output has weight zero
+on `a`. A method that looks only at scalings reports nothing here, which must not be read as
+"identifiable" (the point of Villaverde & Massonis's reply to Castro & de Boer). -/
+
+noncomputable def difference : LaurentSystem 3 where
+  terms := ![[⟨1, ![0, 1, 0]⟩, ⟨-1, ![0, 0, 1]⟩], [], []]
+
+noncomputable def seeX : List (Term 3) := [⟨1, ![1, 0, 0]⟩]
+
+theorem no_scaling_moves_a (A : Matrix (Fin 1) (Fin 3) ℤ) (hsym : difference.IsSymmetry A 0)
+    (hout : OutputInvariant A [seeX]) : A 0 1 = 0 := by
+  have h1 := hsym 0 ⟨1, ![0, 1, 0]⟩ (by simp [difference]) 0
+  have h2 := hout seeX (by simp) ⟨1, ![1, 0, 0]⟩ (by simp [seeX]) 0
+  simp [Matrix.mulVec, dotProduct, Fin.sum_univ_succ] at h1 h2
+  omega
+
+theorem a_not_identifiable : ¬ difference.Identifiable [seeX] 1 := by
+  intro hid
+  -- two solutions with the same x and different a: (x, a, b) = (1, 1, 1) and (1, 2, 2)
+  have sol : ∀ c : ℝ, difference.IsSolution fun _ => ![1, c, c] := fun c i t => by
+    fin_cases i
+    · simpa [LaurentSystem.rhs, Term.eval, monomial, difference, Fin.prod_univ_succ]
+        using hasDerivAt_const t (1 : ℝ)
+    · simpa [LaurentSystem.rhs, difference] using hasDerivAt_const t c
+    · simpa [LaurentSystem.rhs, difference] using hasDerivAt_const t c
+  have := hid (fun _ => ![1, 1, 1]) (fun _ => ![1, 2, 2]) (sol 1) (sol 2)
+    (fun t o ho => by simp at ho; subst ho; simp [poly, Term.eval, monomial, seeX, Fin.prod_univ_succ])
+  norm_num at this
+
+/-! ## 12. An output-preserving scaling must not rescale time
+
+`dx/dt = k`, measured `x`. Changing the unit of time (`t ↦ λ t`, `k ↦ k / λ`) is a symmetry and
+does not change the *value* of `x`, but it changes when each value occurs. And indeed `k` is
+identifiable here: it is the slope of the measured curve. The hypothesis `τ = 0` in
+`IsSymmetry.not_identifiable` cannot be dropped. -/
+
+noncomputable def growth : LaurentSystem 2 where
+  terms := ![[⟨1, ![0, 1]⟩], []]
+
+noncomputable def seeX₂ : List (Term 2) := [⟨1, ![1, 0]⟩]
+
+def timeUnit : Matrix (Fin 1) (Fin 2) ℤ := !![0, -1]
+
+theorem timeUnit_symmetry : growth.IsSymmetry timeUnit ![1] := by decide +kernel
+theorem timeUnit_output : OutputInvariant timeUnit [seeX₂] := by decide +kernel
+
+theorem slope_identifiable : growth.Identifiable [seeX₂] 1 := by
+  intro x x' hx hx' hsame
+  have hfun : (fun s => x' s 0) = fun s => x s 0 := funext fun s => by
+    have := hsame s seeX₂ (by simp)
+    simpa [poly, Term.eval, monomial, seeX₂, Fin.prod_univ_succ] using this
+  have h1 := hx 0 0
+  have h2 := hx' 0 0
+  rw [hfun] at h2
+  have := h2.unique h1
+  simpa [LaurentSystem.rhs, Term.eval, monomial, growth, Fin.prod_univ_succ] using this
+
+/-! ## 13. "For every positive value" matters in the parameter count
+
+Two parameters that always scale together cannot both be normalized in general
+(`not_normalizable_of_kernel_vector`), but for particular values, here equal ones, they can.
+The count theorems are statements about all values, not about one data set. -/
+
+example : ∃ lam : Fin 1 → ℝ, (∀ j, 0 < lam j) ∧
+    ∀ i, scale (!![1, 1] : Matrix (Fin 1) (Fin 2) ℤ) lam ![3, 3] i = 1 := by
+  refine ⟨![1 / 3], fun j => by fin_cases j; norm_num, fun i => ?_⟩
+  fin_cases i <;> simp [scale]
+
+/-! ## 14. Where a denominator vanishes, the rational theory says nothing useful
+
+Lean's division by zero is zero, so a quotient with a vanishing denominator evaluates to `0` and
+the theorems hold there trivially. A model is only meaningful where its denominators are
+nonzero; the theory does not check that for you. -/
+
+example : (⟨[⟨1, ![0]⟩], [⟨1, ![1]⟩]⟩ : Frac 1).eval ![0] = 0 := by
+  simp [Frac.eval, poly, Term.eval, monomial]
 
 end NondimVerifyTest.Limits

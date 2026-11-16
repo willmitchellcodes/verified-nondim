@@ -1,5 +1,9 @@
 # Background: the math, worked by hand on SIR
 
+> **In one line.** The mathematics, worked by hand on SIR, so that every later claim has a calculation behind it.
+>
+> **Start with:** §1–§3, then §9 to check the hand calculation against the tool.
+
 The pipeline turns nondimensionalization into integer linear algebra. That is what makes it
 automatable, and it is also what makes it checkable.
 
@@ -95,8 +99,8 @@ This is a matroid rank question, so a greedy choice is optimal and no SAT/ILP so
 needed. (This criterion is our synthesis of Hubert–Labahn and Tanburn et al. Stating
 precisely what "keep" means and proving the criterion is a contribution of the project.)
 
-* **SAT certificate:** a set S with `rank(A_S) = k` (Lean: `constraintN_sat`).
-* **UNSAT certificate:** `rank(A_candidates) < k` (Lean: `constraintN_unsat`).
+* **SAT certificate:** a set S with `rank(A_S) = k` (Lean: `constraint<k>_enough`).
+* **UNSAT certificate:** `rank(A_candidates) < k` (Lean: `constraint<k>_unsat`).
   SIR examples: "remove 3" is impossible (only 2 scalings exist). "Remove 2 but keep γ and N"
   is impossible (β's column alone has rank 1).
 
@@ -154,3 +158,33 @@ fraction ρ. The scaling `S, I → S/λ, I/λ; β, ρ → λβ, λρ` changes no
 fits synthetic data and shows equally good fits whose β differ twentyfold while R0 agrees to
 four digits (`reports/identifiability_sir.md`). The test is one-way: a parameter that no
 scaling moves may still be non-identifiable for other reasons.
+
+In Lean this is now a theorem for every polynomial model (`IsSymmetry.not_identifiable`,
+`docs/THEORY.md` §8), together with a proof that the test really is one-way.
+
+## 9. Check the hand calculation against the tool
+
+Everything in §1–§5 can be reproduced. The count `7 − 5 = 2` of §3, the new variables of §4 and
+the reduced equations:
+
+```console
+$ nondim reduce sir -n gamma N
+  independent scaling symmetries r = n - rank K = 7 - 5 = 2
+  => parameters: 3 -> 1 (best possible by scaling)
+...
+    t_hat = gamma*t
+    S_hat = S/N
+    beta_hat = N*beta/gamma
+  reduced system:
+    dS_hat/dt_hat = -I_hat*S_hat*beta_hat
+```
+
+And the two facts the calculation rests on, as Lean proves them for this model (variables in
+the order `S, I, R, β, γ, N`): the reduction's scalings respect the unit links, and
+`R₀ = βN/γ` has weight zero under both.
+
+```lean
+theorem links_respected : A * Links = 0 := by decide +kernel
+...
+theorem goal4_R0_dimensionless : A *ᵥ ![0, 0, 0, 1, -1, 1] = 0 := by decide +kernel
+```
