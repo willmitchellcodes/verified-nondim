@@ -252,7 +252,10 @@ Read `docs/RELEASING.md` before touching either. In short:
   `pyproject.toml`), so new Lean files are included automatically. desr cannot be a declared
   dependency, because PyPI does not accept dependencies on a Git address.
 * **Before handing over for a commit:** `lake build`, the full test suite with and without
-  desr, `nondim certify` leaves `git status` clean, and the documentation checks pass.
+  desr, `nondim certify` leaves `git status` clean, and the documentation checks pass. Then run
+  the tests once more in a fresh clone (`git clone` of the working copy into a temporary
+  folder): the automatic tests on GitHub see only tracked files, so anything that leans on
+  `docs/PROPOSAL_NOTES.md`, `lean/.lake`, `.venv` or a local cache passes locally and fails there.
 
 State on 2026-11-16, which will go stale (trust `git log` and PyPI over this line): PyPI has
 0.1.0, built from `main`; the general theorems, the desr certification and everything after

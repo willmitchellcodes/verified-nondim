@@ -33,7 +33,7 @@
   output folder and the test uses a temporary one.
 - **`AGENTS.md`**: a briefing for AI coding agents and new contributors (rules, map of the code,
   testing, limits, documentation and release procedure), checked by the same tests.
-- **Tests**: 968 (471 at 0.1.0), including 35 more corrupted certificates Lean must reject, a
+- **Tests**: 969 (471 at 0.1.0), including 35 more corrupted certificates Lean must reject, a
   Lean file of 14 counterexamples showing every hypothesis of the general theorems is needed,
   a random-model comparison of desr with this package's solver, and a parser that refuses
   code-like input from third-party model files.

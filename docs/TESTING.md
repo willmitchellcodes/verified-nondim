@@ -4,7 +4,7 @@
 >
 > **Start with:** `python -m pytest -q` in `python/`.
 
-**968 tests** in three layers, each mirroring the pipeline. Run everything with `./setup.sh`, or
+**969 tests** in three layers, each mirroring the pipeline. Run everything with `./setup.sh`, or
 separately, from the `python/` folder:
 
 | Command | What runs |

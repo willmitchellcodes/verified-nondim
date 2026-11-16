@@ -58,7 +58,7 @@ certificates.
 | Each hypothesis is needed | `NondimVerifyTest/Limits.lean`: 14 counterexamples checked by Lean |
 | The tests find real problems | three findings in `docs/DESR.md`, one of which changed the main theorem statement |
 
-968 tests in total (904 in Python, 64 that call Lean). Without desr installed, 900 run and 6 are
+969 tests in total (905 in Python, 64 that call Lean). Without desr installed, 901 run and 6 are
 skipped. The documentation is among the things tested: every example in it is executed or
 matched against the sources (`python/tests/test_docs.py`).
 

@@ -17,8 +17,8 @@ Sources are listed in full at the end, keyed like [HL13].
 
 ## Status on 2026-11-16
 
-* `python -m pytest -q`: **968 tests pass** (904 Python/bridge/packaging/documentation + 64 that
-  call Lean). Without desr installed: 900 pass and 6 skip (the desr test module, two Lean tests
+* `python -m pytest -q`: **969 tests pass** (905 Python/bridge/packaging/documentation + 64 that
+  call Lean). Without desr installed: 901 pass and 6 skip (the desr test module, two Lean tests
   and three documentation checks that need desr).
 * `lake build`: **passes** with Lean 4.35.0 / Mathlib v4.35.0 (2512 jobs): the general theory
   (`System`, `Criterion`, `BuckinghamPi`, `Reduction`, `Rational`, `Identifiability`), 28
@@ -378,7 +378,7 @@ Lean notion of "same units"; both are possible and neither is small.
 skip when desr is missing.
 **Reason.** desr is not on PyPI, and PyPI rejects packages whose metadata depends on a direct
 URL. Pinning a commit in documentation (`deff1c0`, version 3.0.0) keeps results reproducible.
-**Evidence.** [tested] the suite passes without desr (900 passed, 6 skipped) and with it (968),
+**Evidence.** [tested] the suite passes without desr (901 passed, 6 skipped) and with it (969),
 both in the cloud workspace; natively without desr at commit `d6547d3` (613 passed, 3 skipped).
 
 ### D31. Three things the tests found
@@ -515,7 +515,11 @@ enforced costs a doc edit whenever a count changes; a rule that is not enforced 
 reader's trust.
 **Convention.** One explanation, one example: `docs/README.md` describes the four kinds of
 block and the vocabulary; `docs/THEORY.md` has an example under every result.
-**Evidence.** [tested] `python/tests/test_docs.py`.
+**Correction, same day.** The first version passed on two machines and failed in the automatic
+tests on GitHub: it required every path named in the documentation to exist, and two of them
+(`docs/PROPOSAL_NOTES.md`, `lean/.lake`) exist only on a machine that created them. Paths listed
+in `.gitignore` are now exempt, and the suite is run in a fresh clone before it is handed over.
+**Evidence.** [tested] `python/tests/test_docs.py`, `test_untracked_paths_are_recognised_from_gitignore`.
 
 ### D41. One briefing file for coding agents, held to the same checks
 **Decision.** `AGENTS.md` in the repository root holds what an AI coding agent needs before it

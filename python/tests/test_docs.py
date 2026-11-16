@@ -82,6 +82,19 @@ def corpus() -> str:
 
 ONLY_IN_THE_BUILT_PACKAGE = {"nondim/_lean_template/"}   # created when the wheel is built
 FILES_OF_OTHER_PROJECTS = {"UnitsSystem.lean"}            # cited, not ours
+def kept_out_of_git() -> list:
+    """The plain entries of `.gitignore` (no wildcards): `lean/.lake`, `docs/PROPOSAL_NOTES.md`, ...
+    The documentation may name them, but they exist only on a machine that created them,
+    never in a fresh clone, which is where the automatic tests run."""
+    lines = [line.strip() for line in (ROOT / ".gitignore").read_text().splitlines()]
+    return [line.strip("/") for line in lines if line and not line.startswith("#") and "*" not in line]
+
+
+def is_kept_out_of_git(path: str) -> bool:
+    path = path.strip("/")
+    return any(path == entry or path.startswith(entry + "/") for entry in kept_out_of_git())
+
+
 PATH = re.compile(r"`((?:docs|python|lean|examples|reports|scripts|assets|tests|nondim)/[^`\s]+)`")
 
 
@@ -92,10 +105,20 @@ def test_paths_named_in_the_documentation_exist(doc):
         if any(ch in raw for ch in "<>{}*…") or raw in ONLY_IN_THE_BUILT_PACKAGE:
             continue  # a pattern such as Certified/<Model>.lean, not one file
         path = raw.rstrip(".,:;)")
+        if is_kept_out_of_git(path):
+            continue  # deliberately untracked: present on the owner's machine, absent from a clone
         candidates = [ROOT / path, ROOT / "python" / path]
         if not any(c.exists() for c in candidates):
             missing.append(raw)
     assert not missing, f"{doc.name} names paths that do not exist: {missing}"
+
+
+def test_untracked_paths_are_recognised_from_gitignore():
+    """Regression: these two exist on a developer's machine and not in a fresh clone. The first
+    version of the check above passed locally and failed in the automatic tests because of them."""
+    assert is_kept_out_of_git("docs/PROPOSAL_NOTES.md")
+    assert is_kept_out_of_git("lean/.lake") and is_kept_out_of_git("lean/.lake/packages/mathlib")
+    assert not is_kept_out_of_git("docs/GUIDE.md") and not is_kept_out_of_git("lean/NondimVerify")
 
 
 @pytest.mark.parametrize("doc", DOCS, ids=IDS)
