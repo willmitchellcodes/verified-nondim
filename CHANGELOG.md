@@ -24,7 +24,16 @@
 - **ODEbase pilot** (`nondim audit`, `docs/ODEBASE.md`): scaling symmetries of 162 published
   polynomial BioModels systems; ten of them with Lean certificates.
 - **Teaching notebook**: `examples/walkthrough.ipynb`.
-- **Tests**: 847 (471 at 0.1.0), including 35 more corrupted certificates Lean must reject, a
+- **Documentation checked by the tests** (`python/tests/test_docs.py`, `docs/README.md`): every
+  document opens the same way, every explanation has an example, and every example is run or
+  matched against the sources. Shell blocks no longer carry inline comments, which an
+  interactive zsh rejects. `write_certificate` accepts a plain string as the path.
+- **Fixed**: running the tests rewrote `reports/identifiability_sir.md` and its figure, with numbers
+  that depend on the platform's optimizer. `examples/03_identifiability.py` now takes an optional
+  output folder and the test uses a temporary one.
+- **`AGENTS.md`**: a briefing for AI coding agents and new contributors (rules, map of the code,
+  testing, limits, documentation and release procedure), checked by the same tests.
+- **Tests**: 968 (471 at 0.1.0), including 35 more corrupted certificates Lean must reject, a
   Lean file of 14 counterexamples showing every hypothesis of the general theorems is needed,
   a random-model comparison of desr with this package's solver, and a parser that refuses
   code-like input from third-party model files.

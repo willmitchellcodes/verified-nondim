@@ -93,6 +93,14 @@ def test_identifiability_example_runs(tmp_path):
     import sys
 
     from conftest import ROOT
-    p = subprocess.run([sys.executable, str(ROOT / "examples" / "03_identifiability.py")], capture_output=True, text=True)
+    report = ROOT / "reports" / "identifiability_sir.md"
+    before = report.read_bytes()
+    # The example writes a report. Its numbers depend on the platform's optimizer, so a test that
+    # let it write into reports/ would change a tracked file on every machine but the one that
+    # produced it. The output folder is therefore passed explicitly.
+    p = subprocess.run([sys.executable, str(ROOT / "examples" / "03_identifiability.py"), str(tmp_path)],
+                       capture_output=True, text=True)
     assert p.returncode == 0, p.stderr
     assert "NOT identifiable" in p.stdout and "invariant groups agree" in p.stdout
+    assert (tmp_path / "identifiability_sir.md").exists()
+    assert report.read_bytes() == before, "the test suite must not rewrite files in reports/"

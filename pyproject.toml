@@ -59,6 +59,6 @@ packages = ["python/nondim"]
 [tool.hatch.build.targets.sdist]
 include = [
     "/python", "/lean", "/docs", "/examples", "/assets", "/scripts", "/reports",
-    "/README.md", "/LICENSE", "/CHANGELOG.md", "/pyproject.toml",
+    "/README.md", "/LICENSE", "/CHANGELOG.md", "/AGENTS.md", "/CLAUDE.md", "/pyproject.toml",
 ]
 exclude = ["/lean/.lake", "/lean/Scratch", "/lean/_tmp_*", "/docs/PROPOSAL_NOTES.md", "__pycache__", ".pytest_cache"]

@@ -1,5 +1,9 @@
 # What this project contributes, on one page
 
+> **In one line.** What this project adds, with the evidence for each claim and what may honestly be said about priority.
+>
+> **Start with:** the table under "What this repository does".
+
 Updated 2026-11-13 after a literature search on prior art and the work that followed from it.
 Every claim points to the theorem, test or source that backs it. The limits are in the last
 two sections and matter as much as the claims.
@@ -54,7 +58,9 @@ certificates.
 | Each hypothesis is needed | `NondimVerifyTest/Limits.lean`: 14 counterexamples checked by Lean |
 | The tests find real problems | three findings in `docs/DESR.md`, one of which changed the main theorem statement |
 
-847 tests in total (783 in Python, 64 that call Lean). Without desr installed, 782 run.
+968 tests in total (904 in Python, 64 that call Lean). Without desr installed, 900 run and 6 are
+skipped. The documentation is among the things tested: every example in it is executed or
+matched against the sources (`python/tests/test_docs.py`).
 
 ## What the literature search found about priority
 
@@ -93,9 +99,9 @@ reduction, and real model collections. Items 3–5 above are aimed there.
    one) are out of reach, and so is the question of which reduction is useful.
 7. Solutions are assumed positive and defined for all time.
 8. **Where it was run.** Everything was built and tested in the assistant's cloud workspace.
-   On the project owner's Mac the state of the `general-theory` branch before this round was
-   built and tested (613 passed, 3 skipped); the additions of this round still need
-   `lake build` and the test suite there.
+   On the project owner's Mac the first state of the `general-theory` branch was built and
+   tested (613 passed, 3 skipped); no later native result is recorded, so the additions since
+   then still need `lake build` and the test suite there.
 
 ## If this were taken further
 

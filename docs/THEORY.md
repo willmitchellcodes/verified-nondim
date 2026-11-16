@@ -1,5 +1,9 @@
 # The general theorems
 
+> **In one line.** The theorems that hold for every model, each with its Lean name, the idea of the proof, an example and its limits.
+>
+> **Start with:** §0 and the example under each section.
+
 The first release proved facts about one model at a time. This part of the Lean library proves
 the facts **once, for every model of a given shape**, so that a per-model certificate only has
 to supply integer matrices and a few polynomial identities.
@@ -58,6 +62,19 @@ Scope, stated once: autonomous systems, right-hand sides that are sums of monomi
 integer exponents (§1–§5) or sums of quotients of such polynomials (§6), solutions defined for
 all time, positive values where a theorem divides or takes logarithms.
 
+**Example.** SIR without `N`, in desr's variable order `β, γ, I, S`. The two parameters have no terms; the theorem under it says the data for `S` is the equation `dS/dt = −βSI`.
+
+```lean
+noncomputable def sys : LaurentSystem 4 where
+  terms := ![[],
+    [],
+    [⟨(-1), ![0, 1, 1, 0]⟩, ⟨1, ![1, 0, 1, 1]⟩],
+    [⟨(-1), ![1, 0, 1, 1]⟩]]
+...
+theorem eq_S (beta gamma I S : ℝ) :
+    sys.rhs 3 ![beta, gamma, I, S] = ((-1) * I * S * beta) := by
+```
+
 ---
 
 ## 1. A symmetry maps solutions to solutions
@@ -87,6 +104,14 @@ applies the same theorem to the inverse factors `1/λ_j`.
 enforces that. The converse "a scaling that maps solutions to solutions is a symmetry of the
 terms" is not proved.
 
+**Example.** Exponential decay `dx/dt = −kx` (variables `x, k`). Changing the unit of time, `t ↦ λt` and `k ↦ k/λ`, is accepted. The same change of `k` with time left alone (time weight 0) is refused. Both are computations.
+
+```lean
+theorem time_symmetry : decay.IsSymmetry Atime ![1] := by decide +kernel
+...
+example : ¬ decay.IsSymmetry Atime ![0] := by decide +kernel
+```
+
 ---
 
 ## 2. Parameters are constant
@@ -101,6 +126,13 @@ is constant (mean value theorem, `is_const_of_deriv_eq_zero` in Mathlib).
 **Why it matters.** Without it, every later theorem would need the hypothesis "the parameters
 do not change", which a reader has to take on trust. With it, the theorems speak about every
 positive solution of the system as given.
+
+**Example.** Along any solution of the decay model, `k` at time `s` is `k` at time 0.
+
+```lean
+example (x : ℝ → Fin 2 → ℝ) (hx : decay.IsSolution x) (s : ℝ) : x s 1 = x 0 1 :=
+  hx.param_const (by decide) s
+```
 
 ---
 
@@ -142,6 +174,14 @@ cannot express: `x ↦ λ²x` is normalizable with `d = 2`, i.e. with a square r
 of values" matters: for particular values a dependent set can happen to be normalizable. The
 "no" direction needs the parameters to be distinct (Limits §4).
 
+**Example.** Two scalings act on three parameters `a, b, c` with weights `(1,0), (0,1), (1,1)`. Any two can be normalized; all three cannot, and the proof is the kernel vector `(1, 1, −1)`.
+
+```lean
+def A : Matrix (Fin 2) (Fin 3) ℤ := !![1, 0, 1; 0, 1, 1]
+...
+  have := h ![1, 1, -1] (by decide +kernel)
+```
+
 ---
 
 ## 4. Buckingham Pi
@@ -179,6 +219,14 @@ first formal proof of a known theorem, not established as one. Note that
 **Limits.** Positive quantities only (Limits §7: "is this length positive?" is unit-independent
 and is not a function of zero groups). The groups must span (Limits §6: leave out the ratio of
 two lengths and the conclusion fails). They need not form an integer basis (Limits §8).
+
+**Example.** The pendulum, with period `T`, length `L`, gravity `g`, mass `m`. The only group is `T²g/L`, so no unit-independent quantity can change when only the mass changes.
+
+```lean
+theorem mass_is_irrelevant {α : Type} (f : (Fin 4 → ℝ) → α) (hf : UnitInvariant D f)
+    (T L g m m' : ℝ) (hT : 0 < T) (hL : 0 < L) (hg : 0 < g) (hm : 0 < m) (hm' : 0 < m') :
+    f ![T, L, g, m] = f ![T, L, g, m'] := by
+```
 
 ---
 
@@ -226,6 +274,17 @@ tests found"); Limits §10 records it in Lean.
 desr's "parameter" scheme and this package's solver. Reductions that mix states into one
 another are not covered. Solutions must be positive.
 
+**Example.** Lotka–Volterra as reduced by desr. `piGroups Vn … 1` and `… 2` are desr's `ν₀ = d·x/a` and `ν₁ = b·y/a`; `monomial (x 0) w` is the factor `a` in the new time `τ = at`.
+
+```lean
+theorem reduction_correct {x : ℝ → Fin 6 → ℝ} (hx : sys.IsSolution x) (hpos : ∀ s i, 0 < x s i)
+    (τ : ℝ) :
+      HasDerivAt (fun τ => piGroups Vn (x (τ / monomial (x 0) w)) 1)
+        (red_x (piGroups Vn (x (τ / monomial (x 0) w)))) τ ∧
+      HasDerivAt (fun τ => piGroups Vn (x (τ / monomial (x 0) w)) 2)
+        (red_y (piGroups Vn (x (τ / monomial (x 0) w)))) τ :=
+```
+
 ---
 
 ## 6. Rational right-hand sides
@@ -257,6 +316,14 @@ For rational models Lean certifies the reduced equation in sum-of-quotients form
 equals the form the tool printed is checked by SymPy, not by Lean. The proofs after `rhs_scale`
 are repeated, not shared with the polynomial case (a refactoring debt, D36).
 
+**Example.** A saturating response `dx/dt = ax/(1 + bx)` (variables `x, a, b`). The two scalings (time together with `a`, and `x` together with `b`) are accepted; scaling `x` without `b` makes `1 + bx` inhomogeneous and is refused.
+
+```lean
+theorem symmetry : saturating.IsSymmetry A ![1, 0] := by decide +kernel
+...
+example : ¬ saturating.IsSymmetry (!![1, 0, 0] : Matrix (Fin 1) (Fin 3) ℤ) ![0] := by decide +kernel
+```
+
 ---
 
 ## 7. Constraints and unit links
@@ -281,6 +348,17 @@ without. Dropping the link is how a *spurious* nondimensionalization arises (Tan
 
 **Not done.** Tanburn et al.'s general theorem that dimensionally consistent changes of
 variables preserve the dimension of the maximal scaling symmetry is not formalized.
+
+**Example.** SIR with `S + I + R − N = 0`. The reduction's scalings keep the law. "Scale `S, I, R` (and `β` to compensate) but not `N`" breaks it, and is nevertheless a symmetry of the differential equations. That is why the law has to be stated.
+
+```lean
+theorem conservation_homogeneous : IsHomogeneous Certified.Own.SIR.A conservation := by
+  decide +kernel
+...
+example : ¬ IsHomogeneous withoutN conservation := by decide +kernel
+...
+example : Certified.Own.SIR.sys.IsSymmetry withoutN ![0] := by decide +kernel
+```
 
 ---
 
@@ -309,6 +387,17 @@ is 1 so the output curve is literally the same function of time, and `2^k ≠ 1`
 **Limits.** `Identifiable` is global and exact (all solutions, all times); the usual structural
 notion is generic. Only polynomial systems (`LaurentSystem`) have this theorem so far.
 
+**Example.** Growth `dx/dt = k` seen through `y = cx` with an unknown gain `c` (variable 2). Doubling `x` and `k` and halving `c` changes no measurement, so `c` is not identifiable.
+
+```lean
+theorem hidden_symmetry : gain.IsSymmetry hidden 0 := by decide +kernel
+theorem hidden_output : OutputInvariant hidden [y] := by decide +kernel
+...
+theorem gain_not_identifiable : ¬ gain.Identifiable [y] 2 :=
+  hidden_symmetry.not_identifiable' hidden_output 2 0 (by decide)
+    ⟨_, a_solution, by simp⟩
+```
+
 ---
 
 ## 9. Goal queries and the minimal parameter count
@@ -335,6 +424,16 @@ not algebraic ("make ε small", "bring variables near 1") are outside this; so a
 rejected before any linear algebra (a group that is not a monomial), which get no Lean
 statement.
 
+**Example.** SIR. "Remove all three parameters" is impossible, because the rank is 2; `R₀ = βN/γ` is dimensionless, so it may be kept.
+
+```lean
+theorem goal2_impossible (S : Fin 3 → Fin 3) (hS : Function.Injective S) :
+    ¬ ∀ c : Fin 6 → ℝ, (∀ i, 0 < c i) →
+        ∃ lam : Fin 2 → ℝ, (∀ j, 0 < lam j) ∧ ∀ i, scale A lam c (goal2_P (S i)) = 1 :=
+...
+theorem goal4_R0_dimensionless : A *ᵥ ![0, 0, 0, 1, -1, 1] = 0 := by decide +kernel
+```
+
 ---
 
 ## 10. What a per-model certificate contains
@@ -355,7 +454,7 @@ statement.
 | `links_respected` (if the model has unit links) | the scalings respect them | §7 |
 | `cannot_remove_more` | the minimal parameter count | §9 |
 | `not_identifiable_<parameter>` (if the model has outputs) | the outputs cannot determine it | §8 |
-| `goal<k>_possible` / `goal<k>_impossible` (own solver, if goals are listed) | the answer to each request | §9 |
+| `goal<k>_possible` / `goal<k>_impossible` (this package's solver, if goals are listed) | the answer to each request | §9 |
 
 Every general theorem and a sample of certificate theorems are checked with `#print axioms`:
 they rest on Lean's three standard axioms (`propext`, `Classical.choice`, `Quot.sound`) and on

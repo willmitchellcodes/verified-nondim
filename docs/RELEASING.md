@@ -1,5 +1,9 @@
 # Releasing: GitHub and PyPI
 
+> **In one line.** How to publish a new version to GitHub and PyPI under your own accounts.
+>
+> **Start with:** "Releasing the next version" if the repository already exists.
+
 Everything here runs under **your own accounts** from your own Terminal. Nothing is published
 until you run a script and confirm.
 
@@ -14,9 +18,12 @@ until you run a script and confirm.
 
 ## 1. Push to GitHub (once)
 
+The first command is a preview: it prints the online steps without doing them. The second asks
+"Type yes" before it creates the public repository.
+
 ```bash
-DRY_RUN=1 ./scripts/publish_github.sh    # preview: prints the online steps without doing them
-./scripts/publish_github.sh              # asks "Type yes" before creating the public repository
+DRY_RUN=1 ./scripts/publish_github.sh
+./scripts/publish_github.sh
 ```
 
 What the script does, in order:
@@ -50,8 +57,9 @@ not change workflows, run `gh auth refresh -s workflow` and push again.
 
 Once pushed, the **Actions** tab runs `ci.yml`: Python tests on two Python versions, then a
 Lean build and the bridge tests. The first Lean run downloads Mathlib and takes several
-minutes. These workflows have not run anywhere yet, so expect to fix a detail or two on the
-first run.
+minutes. The workflow files were written from the documentation of the actions they use and
+could not be run before they were handed over, so look at the first run in the **Actions** tab
+and expect to fix a detail or two.
 
 ## 2. Publish to PyPI
 
@@ -60,10 +68,13 @@ reused by a different project. Do the dry run and the sandbox first.
 
 ### Option A: from your Terminal with an API token
 
+`check` builds and validates and uploads nothing; `testpypi` uploads to the sandbox
+test.pypi.org; `pypi` is the real thing and asks "Type yes".
+
 ```bash
-./scripts/publish_pypi.sh check       # build + validate, uploads nothing
-./scripts/publish_pypi.sh testpypi    # upload to the sandbox test.pypi.org
-./scripts/publish_pypi.sh pypi        # the real thing; asks "Type yes"
+./scripts/publish_pypi.sh check
+./scripts/publish_pypi.sh testpypi
+./scripts/publish_pypi.sh pypi
 ```
 
 You need an account (with two-factor authentication) on https://test.pypi.org and
@@ -82,24 +93,70 @@ One-time setup on https://pypi.org → *Your account → Publishing → Add a pe
 | Workflow name | `publish.yml` |
 | Environment name | `pypi` |
 
-Then each release is:
+After that, a release is three steps. Set `__version__` in `python/nondim/__init__.py`, give
+the "Unreleased" section of `CHANGELOG.md` the version number, and then (shown for 0.2.0):
 
 ```bash
-# 1. bump __version__ in python/nondim/__init__.py and add a section to CHANGELOG.md
-git commit -am "Release 0.1.1" && git push
-gh release create v0.1.1 --title "v0.1.1" --notes "See CHANGELOG.md"
+git commit -am "Release 0.2.0" && git push
+gh release create v0.2.0 --title "v0.2.0" --notes "See CHANGELOG.md"
 ```
 
 Publishing the release starts `.github/workflows/publish.yml` (copied from the template as
-described above), which builds the package and
-uploads it. PyPI trusts that workflow in that repository, so no secret is stored anywhere.
+described above), which builds the package and uploads it. PyPI trusts that workflow in that
+repository, so no secret is stored anywhere.
+
+## Releasing the next version
+
+**Where things stand (2026-11-16).** PyPI has `verified-nondim` 0.1.0, built from `main`. The
+work since then (general theorems, desr, unit links, identifiability, goal queries, rational
+models, the ODEbase pilot) is on the branch `general-theory` and is **not on PyPI**. Its version
+string is still 0.1.0, and PyPI never accepts the same version twice, so a release needs a new
+number. The changes add features without breaking the 0.1.0 commands, which makes it 0.2.0.
+
+1. Run `./setup.sh` (or `lake build` in `lean/` and `python -m pytest -q` in `python/`) on the
+   branch. Everything should pass.
+2. Set `__version__ = "0.2.0"` in `python/nondim/__init__.py`. In `CHANGELOG.md`, rename the
+   heading "Unreleased" to "0.2.0" with the date.
+3. Commit that on the branch, merge into `main` and push:
+
+```bash
+git add -A
+git commit -m "Release 0.2.0"
+git checkout main
+git merge general-theory
+git push
+```
+
+4. Publish, by Option A (`./scripts/publish_pypi.sh check`, then `testpypi`, then `pypi`) or
+   by Option B (create the GitHub release `v0.2.0`).
+5. Check the result as in the next section; `nondim --version` should print 0.2.0.
+
+The package on PyPI then contains the new Lean files as well, because the Lean project is
+bundled as a folder. desr stays optional: it is not on PyPI, and PyPI does not allow a
+dependency on a Git address.
+
+### Protecting `main`
+
+GitHub shows "Your main branch isn't protected" on any repository without a rule for its default
+branch. It is a recommendation, not an error. For a repository with one maintainer a small
+ruleset is enough: in the repository's **Settings**, under **Rules → Rulesets**, choose **New
+ruleset → New branch ruleset**, give it a name, add the target **Include default branch**, and
+select **Restrict deletions** and **Block force pushes**. A new ruleset starts with the
+enforcement status **Disabled**, which does nothing: switch it to **Active** before you click
+**Create**. Requiring status checks or pull requests is optional;
+only require the CI check once you have seen it pass, or it will block every merge. Requiring
+pull requests means you can no longer push to `main` directly, also as the only maintainer,
+unless you add yourself to the ruleset's bypass list. GitHub's description of rulesets:
+<https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets>.
 
 ## 3. Check the result
 
 ```bash
 python3 -m venv /tmp/try && /tmp/try/bin/pip install verified-nondim
+/tmp/try/bin/nondim --version
 /tmp/try/bin/nondim tour
-/tmp/try/bin/nondim init-lean /tmp/try/proofs     # then: cd /tmp/try/proofs && lake exe cache get && lake build
+/tmp/try/bin/nondim init-lean /tmp/try/proofs
+cd /tmp/try/proofs && lake exe cache get && lake build
 ```
 
 ## What is in the package

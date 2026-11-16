@@ -1,5 +1,9 @@
 # Decision record: how and why things are done this way
 
+> **In one line.** Why everything is built the way it is: each decision with its reason, evidence and sources.
+>
+> **Start with:** the status section, then the decision you are curious about.
+
 Each entry gives the decision, the reason, the evidence, and the source. Evidence is one of:
 
 * **[tested]**: checked by a test in this repository (the test is named);
@@ -11,10 +15,11 @@ Each entry gives the decision, the reason, the evidence, and the source. Evidenc
 
 Sources are listed in full at the end, keyed like [HL13].
 
-## Status on 2026-11-13
+## Status on 2026-11-16
 
-* `python -m pytest -q`: **847 tests pass** (783 Python/bridge/packaging + 64 that call Lean).
-  Without desr installed: 782 pass and 3 skip (the desr test module and two Lean tests).
+* `python -m pytest -q`: **968 tests pass** (904 Python/bridge/packaging/documentation + 64 that
+  call Lean). Without desr installed: 900 pass and 6 skip (the desr test module, two Lean tests
+  and three documentation checks that need desr).
 * `lake build`: **passes** with Lean 4.35.0 / Mathlib v4.35.0 (2512 jobs): the general theory
   (`System`, `Criterion`, `BuckinghamPi`, `Reduction`, `Rational`, `Identifiability`), 28
   certificates in the general form (11 from this package's solver, 7 from desr, 10 for
@@ -24,8 +29,8 @@ Sources are listed in full at the end, keyed like [HL13].
 * Where this was run: the numbers above are from the assistant's cloud workspace, with desr
   3.0.0 installed from source. Natively on the Mac (2026-11-13, branch `general-theory`,
   Python 3.13, commit `d6547d3`): `lake build` passed (2493 jobs) and the suite gave 613
-  passed, 3 skipped, without desr. **Everything after that commit (D32–D39) has been built and
-  tested only in the cloud workspace**, as have all tests that need desr.
+  passed, 3 skipped, without desr. **For everything after that commit (D32–D41) the only results
+  recorded here are from the cloud workspace**, as for all tests that need desr.
 * Packaging: unchanged from 0.1.0; the new Lean files are bundled with the wheel through the
   existing directory rule, and `test_wheel_contains_…` still passes.
 * **Not yet exercised:** the GitHub Actions workflows with the desr step (template in
@@ -115,7 +120,7 @@ no SAT/ILP solver is needed. Both verdicts have small certificates: a rank.
 **Evidence.** [tested] `test_normalizable_iff_columns_independent_brute_force` (every subset
 of parameters of every model); `test_rank_criterion_agrees_with_brute_force_for_every_keep_set`
 (every keep-set and every k of every model, against exhaustive search).
-[proved, per model] `constraintN_enough` / `constraintN_unsat` in each certificate.
+[proved, per model] `constraint<k>_enough` / `constraint<k>_unsat` in each certificate.
 **Status.** [synthesis] from [HL13] Thm 7.1 and [T25] Thm 3.5. The general "iff" is stated as
 Exercises 2–3 in `lean/NondimVerify/Exercises.lean` and is **not yet proved in Lean**. What
 *is* proved in general (`Theory.lean`): the scalings form a space of dimension `n − rank K`
@@ -138,8 +143,8 @@ powers are needed.
 **Evidence.** [tested] `test_wanted_group_verdicts_on_sir` (11 cases, every failure reason);
 `test_regrouping_is_correct` (7 cases, numeric identity + invariance + invertibility);
 `test_non_primitive_group_needs_fractional_powers`.
-[proved, per model] `constraintN_want_invariant`, `_want_independent`, `_regroup_unimodular`,
-`_regroup_<state>`; for UNSAT: `_want_not_invariant`, `_want_dependent`.
+[proved, per model] `constraint<k>_want_invariant`, `constraint<k>_want_independent`, `_regroup_unimodular`,
+`_regroup_<state>`; for UNSAT: `_want_not_invariant`, `constraint<k>_want_dependent`.
 **Source.** Modeled on [T25] Theorem 3.8 (preferred invariants extend to a unimodular matrix,
 tested with Smith normal form) [literature]. Ours is a simplified rational-exponent version
 [synthesis].
@@ -274,7 +279,7 @@ name is on them should trigger them.
 `test_publish_github_dry_run_with_gh_never_creates_a_repository`,
 `test_set_repo_url_is_idempotent_and_makes_links_absolute`.
 **Source.** [PYPI-TP], [PYPA-GUIDE] for trusted publishing; [LEAN-ACTION] for the CI Lean job.
-The workflow files follow those documents but have not run yet.
+The workflow files follow those documents; they could not be run from the workspace they were written in, so the repository's Actions tab is the evidence for them.
 
 ### D21. A short README whose examples are executed by the tests
 **Decision.** `README.md` is under 110 lines and built from four examples; the long guide moved
@@ -373,7 +378,7 @@ Lean notion of "same units"; both are possible and neither is small.
 skip when desr is missing.
 **Reason.** desr is not on PyPI, and PyPI rejects packages whose metadata depends on a direct
 URL. Pinning a commit in documentation (`deff1c0`, version 3.0.0) keeps results reproducible.
-**Evidence.** [tested] the suite passes without desr (782 passed, 3 skipped) and with it (847),
+**Evidence.** [tested] the suite passes without desr (900 passed, 6 skipped) and with it (968),
 both in the cloud workspace; natively without desr at commit `d6547d3` (613 passed, 3 skipped).
 
 ### D31. Three things the tests found
@@ -491,6 +496,45 @@ normal form checker); the domain is what is new here.
 
 ---
 
+## Documentation (2026-11-16)
+
+### D40. The documentation is tested like code
+**Decision.** `python/tests/test_docs.py` reads every Markdown file and requires that: each path,
+command, theorem, function and test it names exists; each section reference resolves; each
+example is real (`console` blocks are run and their output matched, `python` blocks are
+executed, `lean` blocks must occur verbatim in the sources, `bash` blocks carry no inline
+comments); the numbers quoted agree with each other, with the collected tests and with the
+ODEbase report; and every document opens with the same two-line summary.
+**Reason.** The documents were written across three rounds of work and had drifted. Writing
+the checks found, on the first run: an example in `docs/DESR.md` that raised an error when run
+(a string passed where a path object was required; the function now accepts both), theorem
+names of the first release written with a placeholder that looked like a real name, shell
+blocks with `#` comments that an interactive zsh rejects (which broke a command for the
+project owner on 2026-11-13), and test counts that differed between documents. A rule that is
+enforced costs a doc edit whenever a count changes; a rule that is not enforced costs the
+reader's trust.
+**Convention.** One explanation, one example: `docs/README.md` describes the four kinds of
+block and the vocabulary; `docs/THEORY.md` has an example under every result.
+**Evidence.** [tested] `python/tests/test_docs.py`.
+
+### D41. One briefing file for coding agents, held to the same checks
+**Decision.** `AGENTS.md` in the repository root holds what an AI coding agent needs before it
+changes anything: the rules (who publishes, what is private, what is untrusted, what may be
+claimed), a map of the code, how things are tested, the limits, the documentation conventions,
+and the release procedure. `CLAUDE.md` contains only an import of it. `AGENTS.md` is in the list
+of documents that `python/tests/test_docs.py` checks.
+**Reason.** Most of this project was written with an AI assistant across several sessions, and
+each session had to rediscover the same rules, some of them the hard way (a push that must be
+made by the owner, a folder a sandbox may not write to, a comment that breaks a pasted
+command). Rules written down once are cheaper than rules relearned. The file name is the open
+format that most coding agents read [AGENTS-MD]; Claude Code reads `CLAUDE.md` first when both
+exist, so that file imports the shared one instead of repeating it. A briefing that is wrong
+is worse than none, which is why it is tested: every path, command and name in it must exist.
+**Evidence.** [tested] `test_agent_instructions_exist_and_are_shared`, and the per-document
+checks of `test_docs.py` applied to `AGENTS.md`.
+
+---
+
 ## Sources
 
 * **[HL13]** E. Hubert, G. Labahn. "Scaling invariants and symmetry reduction of dynamical
@@ -529,5 +573,7 @@ normal form checker); the domain is what is new here.
 * **[PYPI-TP]** PyPI documentation, "Publishing with a Trusted Publisher." https://docs.pypi.org/trusted-publishers/using-a-publisher/
 * **[PYPA-GUIDE]** Python Packaging User Guide, "Publishing package distribution releases using
   GitHub Actions CI/CD workflows." https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
+* **[AGENTS-MD]** AGENTS.md, an open format for instructions to coding agents ("a README for agents"), stewarded by the Agentic AI Foundation under the Linux Foundation. https://agents.md/
+* **[GH-RULESETS]** GitHub Docs, "About rulesets." https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets
 * **[LEAN-ACTION]** `leanprover/lean-action`, GitHub Action for Lean projects. https://github.com/leanprover/lean-action
 * **[K09]** A. Kennedy. "Types for Units-of-Measure: Theory and Practice." CEFP 2009, LNCS 6299.

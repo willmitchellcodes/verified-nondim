@@ -75,11 +75,12 @@ print(analyze_identifiability(observed).summary())
 ## Let Lean check it
 
 ```bash
-nondim init-lean proofs        # a Lean 4 + Mathlib project with the certificates
+nondim init-lean proofs
 cd proofs && lake exe cache get && lake build
 ```
 
-Every claim above becomes a theorem that Lean re-proves. From the SIR certificate:
+`init-lean` creates a Lean 4 + Mathlib project that holds the certificates. Every claim above
+becomes a theorem that Lean re-proves. From the SIR certificate:
 
 ```lean
 theorem symmetries : Amat * Kmat = 0 := by decide +kernel

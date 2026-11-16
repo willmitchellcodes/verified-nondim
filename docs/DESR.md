@@ -1,17 +1,40 @@
 # Certifying desr
 
+> **In one line.** How the answers of desr, the reference tool, are turned into Lean theorems, and what testing that found.
+>
+> **Start with:** `nondim desr lotka_volterra` (needs desr installed).
+
 [desr](https://github.com/ofloveandhate/desr) is the reference implementation of the
 Hubert–Labahn nondimensionalization algorithm, by the authors of Tanburn et al. (2025). This
-package's own solver does the same job less generally. So instead of competing with desr, the
+package's solver does the same job less generally. So instead of competing with desr, the
 package can now **check desr's answers in Lean**: desr computes, Lean verifies, and neither
 desr nor this package's Python has to be trusted.
 
+desr is not on PyPI, so it is installed from its repository:
+
 ```bash
-pip install git+https://github.com/ofloveandhate/desr     # desr is not on PyPI
-nondim desr lotka_volterra        # run desr, cross-check against our solver
-nondim compare                    # both tools on every built-in model -> reports/desr_comparison.md
-nondim certify                    # write Lean certificates, including desr's
-cd lean && lake build             # Lean checks them
+pip install "git+https://github.com/ofloveandhate/desr"
+```
+
+| Command | What it does |
+|---|---|
+| `nondim desr lotka_volterra` | runs desr on one model and cross-checks it against this package's solver |
+| `nondim compare` | both tools on every built-in model → `reports/desr_comparison.md` |
+| `nondim certify` | writes the Lean certificates, including desr's |
+| `lake build` (in `lean/`) | Lean checks them |
+
+```console
+$ nondim desr lotka_volterra
+LotkaVolterra reduced by desr 3.0.0
+  new time: a*t
+    kappa0 = c/a
+    nu0 = d*x/a
+    nu1 = b*y/a
+    dnu0/d(new time) = -nu0*nu1 + nu0
+    dnu1/d(new time) = -kappa0*nu1 + nu0*nu1
+  parameters: 4 -> 1
+...
+cross-check against this package: same scalings: True;  parameters after: desr 1, ours 1;  maximal by our exponent matrix: True
 ```
 
 Without desr installed everything else works; the desr commands say how to install it and the
@@ -56,9 +79,18 @@ For Lotka–Volterra (`lean/NondimVerify/Certified/Desr/LotkaVolterra.lean`), in
 6. desr found as many scalings as exist, by an exponent matrix this package derives on its own
    (`kills_K`, `rank_K`, `rank_A`).
 
-Point 4 is desr's actual claim, stated about the model's own solutions.
+Point 4 is desr's actual claim, stated about the model's own solutions. In the file it reads:
 
-## desr and our solver, side by side
+```lean
+theorem reduction_correct {x : ℝ → Fin 6 → ℝ} (hx : sys.IsSolution x) (hpos : ∀ s i, 0 < x s i)
+    (τ : ℝ) :
+      HasDerivAt (fun τ => piGroups Vn (x (τ / monomial (x 0) w)) 1)
+        (red_x (piGroups Vn (x (τ / monomial (x 0) w)))) τ ∧
+      HasDerivAt (fun τ => piGroups Vn (x (τ / monomial (x 0) w)) 2)
+        (red_y (piGroups Vn (x (τ / monomial (x 0) w)))) τ :=
+```
+
+## desr and this package's solver, side by side
 
 `nondim compare` regenerates this table (`reports/desr_comparison.md`).
 
@@ -71,7 +103,7 @@ Point 4 is desr's actual claim, stated about the model's own solutions.
 | Rosenzweig–MacArthur (rational) | 6 | 3 / 3 | 3 / 3 | yes | certified |
 | spurious (original) | 2 | 1 / 1 | 1 / 1 | yes | certified |
 | spurious (substituted) | 2 | 2 / 2 | 0 / 0 | yes | certified |
-| SIR with `N`, Michaelis–Menten with `s₀`, spurious (fixed) | | | | | certified for our solver only: unit links are not passed to desr yet |
+| SIR with `N`, Michaelis–Menten with `s₀`, spurious (fixed) | | | | | certified for this package's solver only: unit links are not passed to desr yet |
 | SIR with reporting rate `ρ` | 3 | | | | not passed to desr: `ρ` is not in the equations |
 
 "Same scalings" means the two scaling matrices have the same row space. The two tools may
@@ -129,7 +161,7 @@ Out-of-scope inputs raise `NotSupported` with a reason. They are never mis-certi
 | time in the equations | "autonomous" | the theory is for `dx/dt = f(x)` |
 | desr's `dep_var` and `general` schemes | "scheme" | the new variables are then not "one state × parameters" (`docs/THEORY.md` §5b) |
 | no scaling symmetry | "no scaling symmetry" | nothing to reduce |
-| fractional powers (own solver) | "fractional powers" | the Hubert–Labahn form uses integer matrices |
+| fractional powers (this package's solver) | "fractional powers" | the Hubert–Labahn form uses integer matrices |
 | a parameter absent from the equations | "do not appear" | see finding 3 |
 
 ## What is trusted, and what is not
@@ -161,6 +193,13 @@ m = Model.from_strings("Chemostat", {"s": "d*s0 - d*s - k*s*x", "x": "k*s*x - d*
 red = from_desr(m)                     # raises NotSupported with a reason if out of scope
 print(red.summary())
 write_certificate(red, "lean/NondimVerify/Certified/Desr/Chemostat.lean", "Desr.Chemostat")
+```
+
+```text
+Chemostat reduced by desr 3.0.0
+  new time: d*t
+    kappa0 = k*s0/d
+  parameters: 3 -> 1
 ```
 
 Then add `import NondimVerify.Certified.Desr.Chemostat` to `lean/NondimVerify/Certified.lean`

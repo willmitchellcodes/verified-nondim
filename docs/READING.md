@@ -1,5 +1,9 @@
 # Reading list (in order)
 
+> **In one line.** What to read, in order, and which file of this project each source explains.
+>
+> **Start with:** the first three entries.
+
 Several key sources are recent preprints (marked ⚠). Their results may change after peer
 review, so check the latest versions before quoting.
 

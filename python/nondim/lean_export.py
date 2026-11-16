@@ -473,6 +473,7 @@ def _denominator_haves(*exprs) -> str:
 
 
 def write_certificate(nd, path: Path, constraints=(), module=None) -> Path:
+    path = Path(path)  # a plain string is fine too
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(certificate(nd, constraints, module))
     return path

@@ -1,5 +1,9 @@
 # The ODEbase pilot
 
+> **In one line.** What scaling symmetries look like in 162 published models, and how far those numbers can be trusted.
+>
+> **Start with:** the worked example below, then `nondim audit --fetch`.
+
 **Question.** The built-in models are textbook examples. What do scaling symmetries look like in
 models people actually published?
 
@@ -9,13 +13,45 @@ available as text files in the OscarODEbase.jl repository (MIT licence). The pil
 files. **No model data is stored in this repository**; the audit works on a local clone and
 keeps only the statistics.
 
-```bash
-nondim audit --fetch              # clone the model files into ~/.cache/verified-nondim/ and run
-nondim audit --data DIR           # or point at an existing copy of src/odes
-nondim audit --certify 10         # also write Lean certificates for the 10 smallest models
-```
+| Command | What it does |
+|---|---|
+| `nondim audit --fetch` | clones the model files into `~/.cache/verified-nondim/` and runs the audit |
+| `nondim audit --data DIR` | runs it on an existing copy of the `src/odes` folder |
+| `nondim audit --certify 10` | also writes Lean certificates for the 10 smallest models |
 
 The result is `reports/odebase_pilot.md`: a summary and one row per model.
+
+## A worked example: one model, start to finish
+
+A made-up infection model written in the file format the audit reads: two species, three
+parameters, and the conservation law `x1 + x2 = k3`.
+
+```python
+from nondim.odebase import parse_entry, audit_entry
+
+model_file = '''
+paramsRing,(k1,k2,k3)=rational_function_field(QQ,["k1","k2","k3"])
+polRing,(x1,x2)=polynomial_ring(paramsRing,["x1","x2"])
+chemSystem=[ (-1)*k1*x1*x2 + k2*x2, k1*x1*x2 - k2*x2 ]
+constraints=[ x1 + x2 - k3 ]
+ID="EXAMPLE"
+desc="A made-up infection model in the ODEbase file format"
+'''
+row = audit_entry(parse_entry(model_file))
+print(row.species, "species,", row.parameters, "parameters,", row.conservation_laws, "conservation law")
+print("scaling symmetries:", row.scalings)
+print("parameters removable by scaling:", row.removable, "leaving", row.remaining)
+```
+
+```text
+2 species, 3 parameters, 1 conservation law
+scaling symmetries: 2
+parameters removable by scaling: 2 leaving 1
+```
+
+That is one row of the report: time and population size can be rescaled, two of the three
+parameters go, and one dimensionless number remains (here `k1*k3/k2`, the model's `R₀`).
+The audit does this for every file.
 
 ## What the pilot found (run of 2026-11-13)
 
@@ -58,7 +94,15 @@ Ten of the smallest models have Lean certificates in `lean/NondimVerify/Certifie
 (for example `BIOMD0000000484.lean`). Each proves the same theorems as a built-in model:
 symmetry read off the equations, the reduced equations for every positive solution, the
 conservation laws respected, completeness of the invariants, the minimal parameter count. The
-header of each file names the model and its source.
+header of each file names the model and its source. For example:
+
+```lean
+About: Cao2013 - Application of ABSIS method in birth-death process (BioModels BIOMD0000000484, as preprocessed by ODEbase)
+...
+theorem symmetry : sys.IsSymmetry A tau := by decide +kernel
+...
+theorem links_respected : A * Links = 0 := by decide +kernel
+```
 
 The other 148 models with symmetries are **not** certified. Their rows are what this package's
 Python computed. Of them, 116 more fit the certificate format; the rest need fractional
